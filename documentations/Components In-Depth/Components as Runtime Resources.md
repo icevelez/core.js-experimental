@@ -187,14 +187,178 @@ Core Assist extends this further:
 
 ---
 
-## Summary
+## A Major Challenge: Implicit Dependencies
 
-Core treats components as first-class runtime resources.
+Treating components as runtime resources introduces a problem that traditional build systems often solve automatically:
 
-Core Assist transforms those resources into **self-optimizing entities** by introducing persistent compilation caching in the browser.
+> Components rarely exist in isolation.
 
-Together, they form a model where:
+A component may appear self-contained:
 
-* Components remain deployable after shipping
-* Components remain executable in their original form
-* Components become faster over time through caching
+```js
+await component("/components/UserCard.html");
+```
+
+but it may depend on resources that are not immediately obvious.
+
+For example:
+
+```html
+<div class="bg-blue-500 text-white p-4">
+    User Card
+</div>
+```
+
+The component renders successfully, but the styling assumes Tailwind CSS is already available.
+
+Without Tailwind:
+
+```html
+<div class="bg-blue-500 text-white p-4">
+    User Card
+</div>
+```
+
+becomes an unstyled element.
+
+The component technically loads, but it no longer behaves as intended.
+
+---
+
+### Examples of Implicit Dependencies
+
+A component may depend on:
+
+* Tailwind CSS
+* External stylesheets
+* Icon libraries
+* Fonts
+* Utility libraries
+* Shared components
+* Context providers
+* Global application state
+* Browser APIs
+* Custom elements
+
+These dependencies are often not visible from the component URL alone.
+
+```text
+UserCard.html
+      ↓
+Looks self-contained
+      ↓
+Actually depends on:
+  - Tailwind
+  - Heroicons
+  - UserContext
+  - ThemeProvider
+```
+
+---
+
+### How Traditional Bundlers Solve This Problem
+
+Build systems typically construct a dependency graph during compilation:
+
+```text
+Component
+    ↓
+Imports
+    ↓
+Dependency Graph
+    ↓
+Bundle
+```
+
+By the time the application is deployed, many dependencies have already been resolved.
+
+As a result, developers rarely think about whether a component can truly exist independently.
+
+---
+
+### Runtime Resources Expose Dependency Boundaries
+
+When components become distributable resources, dependency boundaries become more visible.
+
+A component loaded from:
+
+```js
+await component(
+    "https://example.com/UserCard.html"
+);
+```
+
+cannot assume the host application provides:
+
+* Tailwind
+* Reactivity libraries
+* CSS resets
+* Fonts
+* Context providers
+
+unless those requirements are explicitly communicated.
+
+The component becomes similar to a package or plugin:
+
+```text
+Resource
+      ↓
+Requires Environment
+```
+
+---
+
+### Possible Solutions
+
+Several approaches can help reduce dependency ambiguity:
+
+#### Documentation
+
+The simplest approach is explicitly documenting requirements.
+
+```text
+UserCard.html
+
+Requires:
+- Tailwind CSS v4
+- Heroicons
+```
+
+#### Resource Manifests
+
+Components could declare required resources:
+
+```js
+export const dependencies = {
+    css: [
+        "https://cdn.example.com/tailwind.css"
+    ]
+};
+```
+
+#### Self-Contained Components
+
+Components may choose to bundle or embed their own styling.
+
+#### Runtime Dependency Resolution
+
+Future systems could automatically discover and load required resources before executing the component.
+
+---
+
+### The Tradeoff
+
+Component resources provide:
+
+* Dynamic loading
+* Runtime composition
+* Independent deployment
+* Plugin-like architectures
+
+However, they also shift responsibility for dependency management from build tools to runtime systems.
+
+In other words:
+
+> The more independently deployable a component becomes, the more important explicit dependency management becomes.
+
+This is one of the primary challenges of treating components as runtime resources.
