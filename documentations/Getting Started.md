@@ -2,138 +2,152 @@
 
 ## What is Core?
 
-> Core is a browser-first JavaScript framework for building modern web applications using HTML components, fine-grained reactivity, and runtime compiler optimizations—all without requiring a mandatory build pipeline.
+Core is a JavaScript framework built from a simple question:
 
-Core embraces the capabilities of the modern web platform while providing the features developers expect from contemporary frontend frameworks.
+> How much of a modern frontend framework can be implemented directly in the browser?
 
-Whether you're building a small interactive widget or a large Single-Page Application, Core scales using the same concepts and APIs.
+Modern frameworks provide many capabilities:
 
-Here is a starting example:
+* Components
+* Reactivity
+* Conditional rendering
+* List rendering
+* Context
+* Lifecycle hooks
+* Single-File Components
+* Runtime and compile-time optimizations
+
+Traditionally these features are delivered through build tools, compilers, and development servers.
+
+Core explores a different approach.
+
+Instead of starting with a build pipeline and generating browser code as the final output, Core starts with the browser itself and builds upward from the capabilities already available on the web platform.
+
+The result is a framework that supports modern application development while remaining directly executable in the browser.
+
 ```html
-<!-- App.html -->
 <script>
     import { signal } from "core";
-    
+
     export default function() {
         const [count, setCount] = signal(0);
     }
 </script>
 
-<button on:click="() => setCount(count()+1)">
+<button on:click="() => setCount(count() + 1)">
     Count is: {{ count() }}
 </button>
 ```
 
-```html
-<!-- index.html -->
-<html>
-    <head>
-        <
-    </head>
-    <body>
-        <div id="app"></div>
-        <script type="module">
-            import { component } from "core/handlebar";
-            import { mount } from "core";
-            
-            const App = await component("App.html");
-            mount(App, "#app");
-        </script>
-    </body>
-</html>
-```
+Although the example is small, it demonstrates several ideas that appear throughout Core:
 
-Even though the example is minimal, it demonstrates two of Core's key features.
+* Components authored as HTML
+* Fine-grained reactivity through signals
+* Declarative templates
+* Runtime compilation
+* Browser-native execution
 
-- HTML Components - Components are authored using familiar HTML and JavaScript.
-
-This keeps components close to the web platform while remaining expressive enough for complex applications.
-
-- Fine-Grained Reactivity - Core automatically tracks reactive state and updates only the UI affected by a state change.
-
-When `count` changes, Core updates the text displaying the value rather than rerendering the entire component.
+These concepts will be explored throughout the rest of the documentation.
 
 ---
 
-The example above introduces the fundamental ideas behind Core. Don't worry if every detail isn't immediately clear—the rest of the documentation will build on these concepts step by step.
+## Why Core Exists
 
-For now, focus on understanding the overall approach and what Core brings to modern web development.
+Core began as an attempt to answer questions about how frontend frameworks work.
 
-> [!IMPORTANT] 
-> Core builds on the foundations of the web, so this documentation assumes basic familiarity with HTML, CSS, and JavaScript. If you're new to frontend development, we recommend spending some time learning these technologies first before adopting a framework.
+Questions such as:
 
---- 
+> How does a framework know what part of the UI to update?
 
-# The Browser-First Framework
+> How does a template become executable code?
 
-Core is built around a simple idea:
+> How do conditional blocks know where to render?
 
-> The browser is capable of being the runtime—not merely the destination of a build process.
+> Why do frameworks compile code?
 
-Modern frontend development often involves package managers, bundlers, transpilers, compilers, development servers, and build pipelines before an application ever reaches the browser.
+Over time those questions evolved into a framework.
 
-These tools are valuable and solve real problems, but they are not always necessary.
+Core is not an attempt to reject modern tooling.
 
-Core takes a different approach.
+Nor is it an attempt to replace every existing frontend workflow.
 
-By leveraging modern browser capabilities such as:
-
-* ES Modules
-* Import Maps
-* HTML Templates
-* Native DOM APIs
-
-Core can provide modern framework features while remaining directly executable in the browser.
+Instead, Core explores a different point in the design space while retaining many of the features developers expect from contemporary frameworks.
 
 ---
 
-## Use Core For
+## Core's Design Goals
 
-Core can be used for a wide variety of applications:
+Core is built around a few core ideas:
 
-* Interactive websites
-* Dashboards and internal tools
-* Single-Page Applications (SPA)
-* Embedded widgets
-* Reusable component libraries
+### Browser-Native Development
+
+Applications should be able to run directly in the browser using modern web standards.
+
+### Fine-Grained Updates
+
+When state changes, only the parts of the UI that depend on that state should update.
+
+### Familiar Authoring Experience
+
+Components should feel natural to write and resemble the structure of the web platform.
+
+### Runtime Flexibility
+
+Framework features should not be tied exclusively to build-time tooling.
+
+### Progressive Optimization
+
+Core can operate entirely in the browser, but additional optimizations can be layered on when desired.
+
+---
+
+## Not Just "No Build Step"
+
+One of Core's most visible characteristics is that it can run without a mandatory build pipeline.
+
+However, this is a consequence of its design rather than its primary goal.
+
+---
+
+## Who Is Core For?
+
+Core is designed for developers who enjoy understanding how the web works and want a framework that stays close to the browser platform.
+
+You may enjoy Core if you:
+
+* Prefer browser-native development
+* Want to learn how modern frameworks work internally
+* Build applications without relying heavily on build tooling
+* Enjoy experimenting with web platform capabilities
+* Need fine-grained reactivity without a virtual DOM
+* Want a framework that can scale from small widgets to larger applications
+
+Core is particularly well suited for:
+
+* Internal tools and dashboards
+* Single-Page Applications
+* Browser-native applications
 * Progressive enhancement
-* Server-rendered applications
-
-It integrates naturally with existing stacks such as:
-
-* Laravel
-* Rails
-* Django
-* Express
-* Bun
-* PHP
-
-and can also be used to build fully browser-native applications.
+* Educational projects
+* Framework experimentation and research
+* Component libraries
 
 ---
 
-## A Different Tradeoff
+### Core May Not Be The Best Fit If
 
-Core is not trying to replace every frontend workflow.
+Core intentionally explores a different set of tradeoffs.
 
-Instead, it explores a different set of tradeoffs.
+You may be better served by frameworks such as React, Vue, Angular, or Svelte if you primarily need:
 
-Core favors:
+* Large ecosystem support
+* Extensive third-party component libraries
+* Mature enterprise tooling
+* Deep TypeScript integration
+* Established hiring pools and community resources
+* Maximum build-time optimization
 
-* Browser-native development
-* Runtime flexibility
-* Incremental adoption
-* Fine-grained updates
-* Minimal tooling requirements
-
-while acknowledging that other ecosystems may provide:
-
-* Larger component ecosystems
-* TypeScript-first workflows
-* More extensive tooling
-* Additional build-time optimizations
-
-If you're looking for a framework that embraces the web platform directly while still providing modern application architecture, Core may be a good fit for you.
+These are areas where more mature ecosystems currently have an advantage.
 
 --- 
 
