@@ -538,9 +538,7 @@ function extract_default_function(source) {
 
 let current_component_promises;
 
-export function defineComponents(component_promises) {
-    current_component_promises = component_promises;
-}
+export const define_components = (component_promises) => current_component_promises = component_promises;
 
 /**
  * @param {string} url

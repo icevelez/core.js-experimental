@@ -1,9 +1,9 @@
 <script>
     import { component } from "core/handlebar";
-    import { defineComponents, signal, memo, effect, bind } from "core";
+    import { define_components, signal, memo, effect, bind } from "core";
     import { Router } from "core-router";
 
-    defineComponents({
+    define_components({
         PropSlotExample : component("src/PropSlotExample.html"),
         Todo : component("src/Todo.html"),
         Example : component("src/Example.html"),
