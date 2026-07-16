@@ -18,9 +18,9 @@
         <script type="module" defer>
             import { component } from "core/handlebar";
             import { mount } from "core";
-            import { start_core_assist } from "core-assist";
+            // import { start_core_assist } from "core-assist";
 
-            await start_core_assist();
+            // await start_core_assist();
 
             const App = await component("./src/App.html");
             mount(App, "#app");

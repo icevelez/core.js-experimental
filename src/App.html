@@ -1,12 +1,14 @@
 <script>
     import { component } from "core/handlebar";
-    import { signal, memo, effect, bind } from "core";
+    import { defineComponents, signal, memo, effect, bind } from "core";
     import { Router } from "core-router";
 
-    export const PropSlotExample = component("src/PropSlotExample.html");
-    export const Todo = component("src/Todo.html");
-    export const Example = component("src/Example.html");
-    // export const Empty = component("src/Empty.html");
+    defineComponents({
+        PropSlotExample : component("src/PropSlotExample.html"),
+        Todo : component("src/Todo.html"),
+        Example : component("src/Example.html"),
+        // Empty : component("src/Empty.html"),
+    })
 
     export default function() {
 

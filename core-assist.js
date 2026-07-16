@@ -17,8 +17,8 @@ const CORE_ASSIST = {
         return new Promise((resolve) => { resolve_map.set(id, resolve) });
     },
     use_cache: async function (url) {
-        const { $COMPONENT_ID, default: render_function, ...component_promises } = await import(url);
-        await CORE.resolve_components(component_promises, $COMPONENT_ID);
+        const { $COMPONENT_ID, default: render_function } = await import(url);
+        await CORE.resolve_components($COMPONENT_ID);
         return render_function;
     },
 }

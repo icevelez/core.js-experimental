@@ -331,7 +331,9 @@ const CORE = {
         anchor.before(fragment);
         return dispose;
     },
-    resolve_components: async function (component_promises, id) {
+    resolve_components: async function (id) {
+        const component_promises = current_component_promises;
+        current_component_promises = null;
         const keys = Object.keys(component_promises || Object.create(null));
         const components = Object.create(component_promises);
         await Promise.all(keys.map(async (k) => { components[k] = await component_promises[k]; }));
@@ -534,6 +536,12 @@ function extract_default_function(source) {
     return null;
 }
 
+let current_component_promises;
+
+export function defineComponents(component_promises) {
+    current_component_promises = component_promises;
+}
+
 /**
  * @param {string} url
  * @param {DocumentFragment} template_processor
@@ -583,9 +591,9 @@ export async function sfc(url, template_processor) {
 
     const script_blob = new Blob([code], { type: 'text/javascript' });
     const script_url = URL.createObjectURL(script_blob);
-    const { default: render_function, ...component_promises } = await import(script_url);
+    const { default: render_function } = await import(script_url);
 
-    await CORE.resolve_components(component_promises, components_id);
+    await CORE.resolve_components(components_id);
 
     return render_function
 }
