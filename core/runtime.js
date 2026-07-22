@@ -86,7 +86,7 @@ const CORE = {
      * @returns {() => void} remove event
      */
     delegate: function (event_name, node, func) {
-        if (typeof func !== "function") throw new Error("[Core] Event delegation error! function is not a function");
+        if (typeof func !== "function") throw new Error("[Core runtime]: Event delegation error! function is not a function");
 
         if (!CORE.delegated_events[event_name]) {
             window.addEventListener(event_name, (e) => match_delegated_node(e, e.target, event_name));
@@ -102,7 +102,7 @@ const CORE = {
      * @param {Node} endNode
      */
     remove_nodes: function (parentNode, startNode, endNode) {
-        if (!parentNode) throw new Error("[Core] Clean up error! Parent node not found");
+        if (!parentNode) throw new Error("[Core runtime]: Clean up error! Parent node not found");
 
         if (startNode === endNode) {
             parentNode.removeChild(startNode);
@@ -150,7 +150,7 @@ const CORE = {
                 anchor.before(fragment);
                 run_deferred_mount_fns();
             } catch (error) {
-                console.trace(error);
+                console.error("[Core runtime]: {{#if}} block render error\n", error);
             }
         }, { track_inner_effect: false })
 
@@ -232,7 +232,7 @@ const CORE = {
 
                 existing_dispose_blocks = new_each_dispose_blocks;
             } catch (error) {
-                console.trace(error);
+                console.error("[Core runtime]: {{#each}} block render error\n", error);
             }
         }, { track_inner_effect: false })
 
@@ -297,7 +297,7 @@ const CORE = {
                 CORE.set_param_args(fragment);
 
                 if (error && catch_fn) dispose_fn = catch_fn(error);
-                else if (error) console.error(error)
+                else if (error) console.error("[Core runtime]: {{#await}} block render error\n", error);
                 else dispose_fn = then_fn(value);
 
                 set_new_context(old_context);
@@ -374,7 +374,7 @@ export function component(url) {
                 stack.push({ name: openName, start: match.index, end: null, outer: '', placeholder: '' });
             } else if (closeName) {
                 const last = stack.pop();
-                if (!last || last.name !== closeName) throw new Error(`[Core-Handlebar] Compilation error! Unbalanced block: expected {{/${last?.name}}} but found {{/${closeName}}}`);
+                if (!last || last.name !== closeName) throw new Error(`[Core compiler]: Unbalanced block: expected {{/${last?.name}}} but found {{/${closeName}}}`);
                 last.end = match.index + full.length;
                 last.outer = source.slice(last.start, last.end);
                 blocks.push(last);
@@ -420,7 +420,7 @@ const parse = {
     if: function (block) {
         RE.if.lastIndex = RE.else.lastIndex = 0;
         const match = RE.if.exec(block);
-        if (!match) throw new Error("[Core-Handlebar] Compilation error! No matching \"if\" block");
+        if (!match) throw new Error("[Core compiler]: No matching \"if\" block");
 
         const [, firstCond, firstBody] = match, exprs = [], fns = [];
         let lastCond = firstCond, lastIndex = 0, m;
@@ -451,7 +451,7 @@ const parse = {
     each: function (block) {
         RE.each.lastIndex = 0;
         const match = RE.each.exec(block);
-        if (!match) throw new Error("[Core-Handlebar] Compilation error! No matching \"each\" block");
+        if (!match) throw new Error("[Core compiler]: No matching \"each\" block");
 
         const [, expr, blockVar, indexVar, content] = match,
             parts = content.split(/{{:empty}}/),
@@ -469,7 +469,7 @@ const parse = {
     await: function (block) {
         RE.await.lastIndex = RE.then.lastIndex = RE.catch.lastIndex = RE.blockSplit.lastIndex = 0;
         const match = RE.await.exec(block);
-        if (!match) throw new Error("[Core-Handlebar] Compilation error! No matching \"await\" block");
+        if (!match) throw new Error("[Core compiler] No matching \"await\" block");
 
         const [, promiseExpr, content] = match,
             thenMatch = RE.then.exec(content),
@@ -541,8 +541,8 @@ function discover_node_instruction(node, node_index = [], instruction = { childr
     if (is_component_node || is_core_component_node) {
         const component = node.dataset.component || null;
         const component_tag = node.dataset.componentTag || null;
-        if (is_core_component_node && !component) throw new Error("[Core] Node processing error! No default component found");
-        if (is_component_node && !component_tag) throw new Error("[Core] Node processing error!component not found");
+        if (is_core_component_node && !component) throw new Error("[Core compiler]: Node processing error! No default component found");
+        if (is_component_node && !component_tag) throw new Error("[Core compiler]: Node processing error! component not found");
         replace_node_with_anchor(node, "component-block");
         instruction.children.push(node_index);
         instruction.component_blocks.push({ child_index: instruction.children.length - 1, component, component_tag, props_id: node.dataset.blockPropsId, slot_id: node.dataset.slotId });
@@ -685,7 +685,7 @@ export async function sfc(url, template_processor) {
     const response = await fetch(url);
     const response_url = response.url;
     const text = await response.text();
-    if (!response.ok) throw new Error(`[Core]: Loading component error! Network request not ok.\n\n${text}`);
+    if (!response.ok) throw new Error(`[Core runtime]: Loading component error! Network request not ok.\n\n${text}`);
 
     const core_assist = window.__core_assist__;
     if (core_assist && await core_assist.has_cache(url, text)) return core_assist.use_cache(response_url);
@@ -815,12 +815,12 @@ ${
                 const props = Object.entries(component?.props || []);
                 return `const $COMPONENT${i} = ${block.component ? `${block.component}` : `$COMPONENTS.${block.component_tag}`};
         const $COMPONENT${i}_PROPS = {${props.map((p) => `get ${p[0]}() { return (${JSON.stringify(p[1])}) }`).join(",") }${ (props.length > 0 && component.dynamic_props.length > 0) ? ',' : ''} ${component.dynamic_props.map((p) => `get ${p.key}(){ return (${p.expr}) }`).join(", ")}};
-        if (!$COMPONENT${i}) throw new Error('[Core] Loading component error! Component "<${block.component || block.component_tag}>" not found');
+        if (!$COMPONENT${i}) throw new Error('[Core runtime]: Loading component error! Component "<${block.component || block.component_tag}>" not found');
         $DISPOSE_FNS[${++dispose_fn_i}] = $CORE.core_component($CHILD${block.child_index}, $COMPONENT${i}, $COMPONENT${i}_PROPS, () => {${component_slot_fn_code?.replaceAll("\n", "\n\t") || ""}});`}).join("\n\n\t")
 }${
         (instruction.use_directives.length > 0 ? '\n\n\t\t// USE DIRECTIVE\n\t' : '') +
         instruction.use_directives.map((directive, i) => {
-            return `\tif (typeof ${directive.func_name} !== "function") throw new Error('[Core] Element directive error! \"${directive.func_name}\" is not a function')
+            return `\tif (typeof ${directive.func_name} !== "function") throw new Error('[Core runtime]: Element directive error! \"${directive.func_name}\" is not a function')
         $CORE.on_mount(() => ${directive.func_name}($CHILD${directive.child_index}, (${directive.expr || 'undefined'})))`;
         }).join("\n\t")
 }${
@@ -1027,7 +1027,7 @@ function run_mount_fns(context) {
             const destroy_fn = fn();
             if (typeof destroy_fn === "function") context[CORE.DESTROY_FNS].push(destroy_fn);
         } catch (error) {
-            console.error(error);
+            console.error("[Core lifecycle hooks]: mounting error\n", error);
         }
     }
 
@@ -1039,7 +1039,7 @@ function run_destroy_fns(context) {
         try {
             fn();
         } catch (error) {
-            console.error(error);
+            console.error("[Core lifecycle hooks]: destroying error\n", error);
         }
     }
 
@@ -1102,7 +1102,7 @@ function trigger(dep) {
             for (const fn of effect_queue) fn();
             for (const fn of ticks) fn();
         } catch (error) {
-            console.error("effect microtask execution error\n", effect_queue, error)
+            console.error("[Core reactivity]: effect microtask execution error\n", effect_queue, error)
         } finally {
             prio_effect_queue.length = effect_queue.length = ticks.length = 0;
             is_flushing = false;
@@ -1128,7 +1128,7 @@ function dispose_deps(effect_fn) {
  * @param {{ track_inner_effect : boolean, is_priority : boolean }} options
  */
 export function effect(fn, options = { track_inner_effect : true, is_priority : false }) {
-    if (typeof fn !== "function") throw new Error("[Core] Reactivity error! Effect callback is not a function");
+    if (typeof fn !== "function") throw new Error("[Core reactivity]: effect callback is not a function");
 
     let dispose_fn = null;
     let active = true;      // flag to prevent effect re-run if already dispose
@@ -1138,7 +1138,7 @@ export function effect(fn, options = { track_inner_effect : true, is_priority : 
         try {
             dispose_fn();
         } catch (error) {
-            console.trace("effect cleanup error\n", fn, error);
+            console.error("[Core reactivity]: effect cleanup error\n", fn, error);
         } finally {
             dispose_fn = null;
         }
@@ -1156,7 +1156,7 @@ export function effect(fn, options = { track_inner_effect : true, is_priority : 
         try {
             dispose_fn = fn();
         } catch (error) {
-            // error ares ignored because some are just effect residue
+            console.error("[Core reactivity]: effect execution error\n", fn, error);
         } finally {
             effect_stack.pop();
             current_effect = effect_stack[effect_stack.length - 1] || null;
