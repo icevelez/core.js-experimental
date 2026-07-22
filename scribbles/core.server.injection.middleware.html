@@ -1,0 +1,29 @@
+<script server>
+    import Database from "./db.js";
+
+    export async function load() {
+        const users = Database.query("....");
+
+        return {
+            users,
+            date : new Date(),
+        }
+    }
+</script>
+
+<script>
+    import { signal, bind } from "core";
+
+    const load = $load();
+
+    export default function() {
+
+        const [name, setName] = signal("John");
+        const [count, setCount] = signal(0);
+
+    }
+</script>
+
+<h1>Hello {{ name() }}</h1>
+<input on:input="(e) => setName(e.target.value)" :value="name()">
+<button on:click="() => setCount(count()+1)">Count: {{ count() }}</button>
