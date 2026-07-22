@@ -1420,9 +1420,6 @@ function create_proxy(container) {
 
 // HELPER FUNCTIONS
 
-/** @type {(template_url:string) => Promise<string>} */
-export const load = (template_url) => fetch(template_url).then((response) => response.text());
-
  /** @type {(length:number) => string} */
 export const make_id = (length) => {
      let result = '';

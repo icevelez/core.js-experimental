@@ -38,7 +38,7 @@ import {
     record,
     object,
     union,
-    assertedObject
+    asserted_object
 } from 'https://github.com/icevelez/Core/blob/master/lib/validtype.js';
 ```
 
@@ -64,7 +64,7 @@ import {
     record,
     object,
     union,
-    assertedObject
+    asserted_object
 } from 'validtype';
 ```
 
@@ -226,7 +226,7 @@ id.validate('abc');
 
 # Asserted Objects
 
-## `assertedObject(object, schema)`
+## `asserted_object(object, schema)`
 
 Creates a proxied object that enforces runtime validation.
 
@@ -236,7 +236,7 @@ const schema = object({
     age: number()
 });
 
-const user = assertedObject({
+const user = asserted_object({
     name: 'John',
     age: 25
 }, schema);
@@ -260,6 +260,85 @@ user.age = 'hello';
 ```js
 user.address = 'Earth';
 // throws error
+```
+
+---
+
+Yes. I would add it as a new major section after **Asserted Objects**, since conceptually it belongs to the same family of "runtime enforcement" APIs.
+
+---
+
+# Asserted Functions
+
+## `asserted_function(schema, func)`
+
+Creates a wrapper function that validates the input before executing the target function.
+
+This is useful when you want to validate function arguments without manually calling `.validate()` each time.
+
+```js
+import {
+    string,
+    asserted_function
+} from 'validtype';
+```
+
+---
+
+## Basic Example
+
+```js
+const greet = asserted_function(
+    string(),
+    (name, error) => {
+        if (error) {
+            console.error(error);
+            return;
+        }
+
+        console.log(`Hello ${name}`);
+    }
+);
+
+greet('John');
+// Hello John
+```
+
+---
+
+## Validation Failure
+
+```js
+greet(123);
+// TypeError: not a string
+```
+
+---
+
+## Object Schema Example
+
+```js
+const UserSchema = object({
+    name: string(),
+    age: number()
+});
+
+const saveUser = asserted_function(
+    UserSchema,
+    (user, error) => {
+        if (error) {
+            console.error(error);
+            return;
+        }
+
+        console.log('Saving user:', user.name);
+    }
+);
+
+saveUser({
+    name: 'John',
+    age: 25
+});
 ```
 
 ---
@@ -304,7 +383,7 @@ const TodoSchema = object({
     tags: array(string()).optional()
 });
 
-const todo = assertedObject({
+const todo = asserted_object({
     title: 'Learn ValidType',
     completed: false,
     tags: ['validation', 'javascript']
