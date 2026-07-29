@@ -1,48 +1,50 @@
+import { CORE } from "core";
+
 /** @typedef {{ children : number[][], text_funcs : { child_index : number, expr : string }[], attr_funcs : { child_index : number, expr : string, property : string }[], bindings : { child_index : number, var : string, property : string, event_name : string }[], events : { child_index : number, event_name : string, expr : string }[], blocks : { child_index : number, type : string, id : string }[], core_component_blocks : { child_index : number, component_name : string, props_id : string }, component_blocks : { child_index : number, component_tag : string, props_id : string }, use_directives : { child_index : number, func_name : string, expr : string }[] slot_child_index : number  }} Instruction */
 
-const CORE = window.__core__;
-
-// TEMPLATE PARSER
-
 /**
- * @param {string} url
+ * @param {string} text
+ * @param {string} source_url
  * @returns {Promise<Function>}
  */
-export function component(text, source_url) {
-    return convert_core_component_to_js_module(text, source_url, function (source) {
-        const blockPattern = /{{#(await|if|each)(.*?)}}|{{\/(await|if|each)}}/gs, stack = [], blocks = [];
-        let match;
+export const component = (text, source_url) => compiler(text, source_url, template_parser);
 
-        while ((match = blockPattern.exec(source))) {
-            const [full, openName, , closeName] = match;
-            if (openName) {
-                stack.push({ name: openName, start: match.index, end: null, outer: '', placeholder: '' });
-            } else if (closeName) {
-                const last = stack.pop();
-                if (!last || last.name !== closeName) throw new Error(`[Core compiler]: Unbalanced block: expected {{/${last?.name}}} but found {{/${closeName}}}`);
-                last.end = match.index + full.length;
-                last.outer = source.slice(last.start, last.end);
-                blocks.push(last);
-            }
+/**
+ * @param {string} source
+ */
+function template_parser(source) {
+    const blockPattern = /{{#(await|if|each)(.*?)}}|{{\/(await|if|each)}}/gs, stack = [], blocks = [];
+    let match;
+
+    while ((match = blockPattern.exec(source))) {
+        const [full, openName, , closeName] = match;
+        if (openName) {
+            stack.push({ name: openName, start: match.index, end: null, outer: '', placeholder: '' });
+        } else if (closeName) {
+            const last = stack.pop();
+            if (!last || last.name !== closeName) throw new Error(`[Core compiler]: Unbalanced block: expected {{/${last?.name}}} but found {{/${closeName}}}`);
+            last.end = match.index + full.length;
+            last.outer = source.slice(last.start, last.end);
+            blocks.push(last);
         }
+    }
 
-        blocks.sort((a, b) => b.start - a.start);
+    blocks.sort((a, b) => b.start - a.start);
 
-        let html = source;
-        for (let i = 0; i < blocks.length; i++) {
-            const block = blocks[i], block_id = `${block.name}-${make_id(6)}`;
-            for (let j = 0; j < i; j++) {
-                if (!block.outer.includes(blocks[j].outer)) continue;
-                block.outer = block.outer.replace(blocks[j].outer, blocks[j].placeholder);
-                block.end -= blocks[j].outer.length - blocks[j].placeholder.length; // modify block.end when replacing
-            }
-            block.placeholder = `<template data-block="${block.name}" data-block-id="${block_id}"></template>`;
-            html = html.slice(0, block.start) + block.placeholder + html.slice(block.end);
-            CORE.add_block_to_cache(block_id, parse[block.name](block.outer));
+    let html = source;
+    for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i], block_id = `${block.name}-${make_id(6)}`;
+        for (let j = 0; j < i; j++) {
+            if (!block.outer.includes(blocks[j].outer)) continue;
+            block.outer = block.outer.replace(blocks[j].outer, blocks[j].placeholder);
+            block.end -= blocks[j].outer.length - blocks[j].placeholder.length; // modify block.end when replacing
         }
+        block.placeholder = `<template data-block="${block.name}" data-block-id="${block_id}"></template>`;
+        html = html.slice(0, block.start) + block.placeholder + html.slice(block.end);
+        CORE.add_block_to_cache(block_id, parse[block.name](block.outer));
+    }
 
-        return html;
-    });
+    return html;
 }
 
 const RE = {
@@ -311,9 +313,10 @@ function extract_default_function(source) {
 
 /**
  * @param {string} text
+ * @param {string} source_url
  * @param {DocumentFragment} template_processor
  */
-async function convert_core_component_to_js_module(text, source_url, template_processor) {
+async function compiler(text, source_url, template_processor) {
     const base = document.createElement("template");
     base.innerHTML = text;
 
@@ -581,7 +584,7 @@ function inject_scope_id_to_children(fragment, scope_id) {
  // HELPER FUNCTIONS
 
   /** @type {(length:number) => string} */
- export const make_id = (length) => {
+ const make_id = (length) => {
       let result = '';
       const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
       for (var i = 0; i < length; i++) result += characters.charAt(Math.floor(Math.random() * characters.length));

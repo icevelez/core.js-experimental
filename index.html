@@ -2,27 +2,22 @@
 <html>
     <head>
         <title>Core Playground</title>
-    </head>
-    <body>
-        <div id="app"></div>
         <script type="importmap">
           {
             "imports": {
                 "core": "./core/runtime.js",
                 "core-compiler": "./core/compiler.js",
-                "core-assist" : "./core-assist.js",
-                "core-router": "./lib/core-router.js"
             }
           }
         </script>
-        <script type="module" defer>
-            import { component, mount } from "core";
-            // import { start_core_assist } from "core-assist";
-
-            // await start_core_assist();
-
-            const App = await component("./src/App.html");
-            mount(App, "#app");
+        <script type="module">
+            import { init } from "core";
+            init();
         </script>
+    </head>
+    <body>
+        <div>
+            <template id="app" core-src="./src/App.html"></template>
+        </div>
     </body>
 </html>

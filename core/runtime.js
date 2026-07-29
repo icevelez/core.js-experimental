@@ -11,7 +11,7 @@
 /** @type {any | null} */
 let arg_global = null;
 
-const CORE = {
+export const CORE = Object.freeze({
     version: "0.5.0",
     show_anchor_blocks : true, // flag to use comment node instead of text node as anchor, good for debugging
     PRP_STATE: Symbol(),
@@ -341,7 +341,7 @@ const CORE = {
     add_block_to_cache: function (key, block) {
         CORE.block_cache.set(key, block)
     },
-}
+})
 
 /**
  * @param {Event} event
@@ -366,7 +366,7 @@ export function component(url) {
     if (component_cache.has(full_url)) return component_cache.get(full_url);
 
     const promise = new Promise(async (resolve, reject) => {
-        const response = await fetch(url);
+        const response = await fetch(url, { headers : { "x-core" : "core-component" }}); // the header is a tag for Core Server to look to indicate this resource can be compiled
         if (!response.ok) return reject(await response.text());
 
         const content_type = response.headers.get("content-type") || "";
@@ -379,7 +379,8 @@ export function component(url) {
 
             await CORE.resolve_components($COMPONENT_ID);
 
-            return render_function;
+            resolve(render_function);
+            return;
         }
 
         const [text, core_compiler] = await Promise.all([response.text(), import("core-compiler")]);
@@ -426,20 +427,48 @@ export function get_context(key) {
 
 // LIFECYCLE API
 
+export async function init() {
+    /** @type {Map<string, Function>} */
+    const core_components = new Map();
+
+    await Promise.all(Array.from(document.querySelectorAll("template[core-src]")).map(async (template) => {
+        const src = template.getAttribute("core-src") || "";
+        if (!src) return;
+        const component_instance = await component(src);
+        const name = src.split("?")[0].split("/").at(-1);
+        core_components.set(name, mount(component_instance, template, true));
+    }))
+
+    return {
+        components: core_components,
+        dispose: () => {
+            core_components.forEach((dispose) => dispose());
+            core_components.clear();
+        }
+    };
+}
+
 /**
  * @param {CoreComponent} app
  * @param {HTMLElement} target
+ * @param {Boolean} should_replace
  * @returns {() => void} dispose function
  */
-export function mount(app, target) {
+export function mount(app, target, should_replace) {
+    const fragment = document.createDocumentFragment();
     const context = create_new_context();
     context[CORE.MOUNT_FNS] = [];
     context[CORE.DESTROY_FNS] = [];
 
     set_new_context(context);
-    CORE.set_param_args(typeof target === "string" ? document.querySelector(target) : target);
+    CORE.set_param_args(should_replace ? fragment : typeof target === "string" ? document.querySelector(target) : target);
 
     const dispose = app();
+
+    if (should_replace) {
+        target.before(fragment);
+        target.parentElement.removeChild(target);
+    }
 
     context[CORE.IS_MOUNTED] = true;
 

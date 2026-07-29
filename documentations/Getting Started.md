@@ -200,21 +200,20 @@ Throughout the rest of the documentation, we will be primarily using ES modules 
         <script type="importmap">
           {
             "imports": {
-                "core/handlebar": "https://cdn.jsdelivr.net/gh/icevelez/Core@master/core/parser/handlebar.js",
-                "core": "https://cdn.jsdelivr.net/gh/icevelez/Core@master/core/runtime.js"
+                "core": "https://cdn.jsdelivr.net/gh/icevelez/Core@master/core/runtime.js",
+                "core-compiler": "https://cdn.jsdelivr.net/gh/icevelez/Core@master/core/compiler.js"
             }
           }
         </script>
+        <script type="module">
+            import { init } from "core";
+            init();
+        </script>
     </head>
     <body>
-        <div id="app"></div>
-        <script type="module" defer>
-            import { component } from "core/handlebar";
-            import { mount } from "core";
-            
-            const App = await component("App.html");
-            mount(App, "#app");
-        </script>
+        <div>
+            <template core-src="./src/App.html"></template>
+        </div>
     </body>
 </html>
 ```
