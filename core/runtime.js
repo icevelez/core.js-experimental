@@ -431,12 +431,12 @@ export async function init() {
     /** @type {Map<string, Function>} */
     const core_components = new Map();
 
-    await Promise.all(Array.from(document.querySelectorAll("template[core-src]")).map(async (template) => {
+    await Promise.all(Array.from(document.querySelectorAll("template[core-src]")).map(async (template, i) => {
         const src = template.getAttribute("core-src") || "";
+        const id = template.id || "";
         if (!src) return;
         const component_instance = await component(src);
-        const name = src.split("?")[0].split("/").at(-1);
-        core_components.set(name, mount(component_instance, template, true));
+        core_components.set(id || i, mount(component_instance, template, true));
     }))
 
     return {
