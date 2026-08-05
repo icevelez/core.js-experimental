@@ -450,7 +450,7 @@ while(true){}
 
 cannot respond to messages.
 
-Worker Pool protects against this by enforcing a worker lifetime limit.
+Worker Pool protects against this by enforcing a worker lifetime limit of 5 minutes.
 
 Example:
 
