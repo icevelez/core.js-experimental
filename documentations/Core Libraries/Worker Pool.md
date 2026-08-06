@@ -52,7 +52,7 @@ Simply add the library in your importmap then import the library using its desig
 <script type="importmap">
 {
     "imports" : { 
-        "worker-pool" : "https://cdn.jsdelivr.net/gh/icevelez/Core@master/documentations/Core%20Libraries/Worker%20Pool.md"   
+        "worker-pool" : "https://cdn.jsdelivr.net/gh/icevelez/Core@master/lib/worker-pool.js"   
     }
 }
 </script>
