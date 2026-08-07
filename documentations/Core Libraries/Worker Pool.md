@@ -105,34 +105,22 @@ The Worker Pool architecture:
 
 ```
 Main Thread
-
-    |
     |
     |  Task
     |
     v
-
 Worker Pool Scheduler
-
-    |
     |
     +------------+
     |            |
     v            v
-
 Worker       Worker
 Thread       Thread
-
-    |
     |
     v
-
 Result
-
-    |
     |
     v
-
 Promise Resolve
 ```
 
@@ -148,31 +136,24 @@ The pool:
 2. Creates workers when required.
 3. Queues tasks when all workers are busy.
 4. Assigns queued tasks when workers become available.
-5. Terminates workers that exceed their maximum lifetime.
+5. Terminates workers that exceed their maximum task/idle time.
 
 ---
 
-# Worker Limits
+# Automatic Worker Pooling
 
-The worker count is automatically determined:
+Worker Pool automatically creates workers based on available CPU cores.
 
 ```js
-const MAX_WORKERS = navigator.hardwareConcurrency || 1;
+const MAX_WORKERS =
+    Math.max(1, (navigator.hardwareConcurrency || 2) - 1);
 ```
 
-Example:
+The main thread keeps one CPU core available for:
 
-A CPU with:
-
-```
-8 cores
-```
-
-creates up to:
-
-```
-8 workers
-```
+- rendering
+- user interaction
+- browser tasks
 
 ---
 
@@ -229,13 +210,12 @@ worker.run.<functionName>
 
 ---
 
-# Multiple Worker Pools
+# Multiple Worker
 
 You can create isolated worker pools which manages its own function registry but shares the same underlying scheduler and workers:
 
 ```js
 const image_workers = create_worker();
-
 const data_workers = create_worker();
 ```
 
@@ -345,77 +325,163 @@ Future calls reuse the cached version.
 Workers have a maximum execution lifetime:
 
 ```js
-const MAX_WORKER_LIFE = 1000 * 60 * 5;
+const MAX_WORKER_TASK_TIME = 1000 * 60 * 5;
 ```
 
-Default:
+Protects against:
 
-```
-5 minutes
-```
-
-If a worker does not respond:
-
-```
-Worker
- |
- X
- |
-Terminate
-```
-
-The pool:
-
-1. Terminates the worker.
-2. Rejects the pending Promise.
-3. Creates a replacement worker.
-4. Continues processing queued tasks.
-
----
-
-# Handling Infinite Loops
+- infinite loops
+- accidental expensive computations
+- frozen workers
 
 Example:
 
-```js
-const badTask = wrap(function(){
-    while(true){}
-});
+```
+Worker
 
-
-await badTask();
+Task starts
+    |
+    |
+    +--------------------+
+                         |
+                    5 minutes
+                         |
+                         v
+                  Worker terminated
 ```
 
-The Worker Pool detects that the worker exceeded:
+The pending Promise is rejected:
 
 ```js
-MAX_WORKER_LIFE
+Error("Worker timeout")
 ```
 
-and terminates it.
+---
 
-The main thread remains responsive.
+# Maximum Idle Lifetime
+
+```js
+MAX_WORKER_IDLE_TIME = 5000;
+```
+
+Idle workers are automatically destroyed.
+
+Example:
+
+```
+CSV Import
+
+Worker 1  BUSY
+Worker 2  BUSY
+Worker 3  BUSY
+
+Import finished
+
+Worker 1  IDLE
+Worker 2  IDLE
+Worker 3  IDLE
+
+5 seconds later
+
+Worker 1  destroyed
+Worker 2  destroyed
+Worker 3  destroyed
+```
+
+Benefits:
+
+- releases worker memory
+- prevents unused workers consuming resources
+- adapts to device limitations
+
+---
+
+# Scheduler
+
+Tasks are placed into a queue:
+
+```js
+task_queue.push(task);
+```
+
+The scheduler searches for available workers:
+
+```
+Task Queue
+
+Task A
+Task B
+Task C
+Task D
+        |
+        v
+Worker 1 -> Task A
+Worker 2 -> Task B
+Worker 3 -> Task C
+Worker 4 -> Task D
+```
+
+If all workers are busy:
+
+```
+Worker 1 BUSY
+Worker 2 BUSY
+Worker 3 BUSY
+        |
+        v
+Task Queue
+
+Task E
+Task F
+Task G
+```
+
+When a worker finishes:
+
+```
+Worker 1 COMPLETE
+        |
+        v
+Scheduler assigns next task
+```
 
 ---
 
 # Error Handling
 
-Worker errors automatically reject the Promise.
+Workers handle:
+
+## Runtime errors
 
 Example:
 
 ```js
-const task = wrap(function(){
-    throw new Error("Something failed");
-});
-
-
-try {
-    await task();
-} catch(error){
-    console.error(error);
-}
+throw new Error("Invalid CSV");
 ```
+
+Returned:
+
+```js
+Promise.reject(
+    Error("Invalid CSV")
+)
+```
+
+---
+
+## Worker crashes
+
+If a worker unexpectedly crashes:
+
+```js
+worker.onerror
+```
+
+Worker Pool:
+
+1. Rejects the active Promise
+2. Removes the worker
+3. Creates replacement workers when required
 
 ---
 
@@ -460,6 +526,87 @@ await compress(data);
 ```js
 await simulate(world);
 ```
+
+---
+
+# Example
+
+## Heavy Computation
+
+```js
+const fibonacci = wrap(
+    function fib(n){
+        if(n <= 1)
+            return n;
+
+        return fib(n-1)+fib(n-2);
+    }
+);
+
+const result = await fibonacci(45);
+```
+
+The main thread remains responsive.
+
+---
+
+# Parallel Execution Example
+
+Without Worker Pool:
+
+```js
+await Promise.all([
+    expensiveTask(a),
+    expensiveTask(b),
+    expensiveTask(c)
+]);
+```
+
+All tasks execute on the main thread.
+
+```
+Main Thread
+
+Task A █████
+Task B      █████
+Task C           █████
+```
+
+The UI may freeze.
+
+---
+
+With Worker Pool:
+
+```js
+await Promise.all([
+    workerTask(a),
+    workerTask(b),
+    workerTask(c)
+]);
+```
+
+Execution:
+
+```
+Main Thread
+
+Scheduler
+
+
+Worker 1
+Task A █████
+
+
+Worker 2
+Task B █████
+
+
+Worker 3
+Task C █████
+```
+
+The browser remains responsive.
 
 ---
 
