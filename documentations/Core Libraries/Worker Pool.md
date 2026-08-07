@@ -1,235 +1,351 @@
 # Worker Pool
 
-A lightweight worker pool for executing CPU-intensive JavaScript functions on background threads using the Web Worker API.
+A lightweight JavaScript Worker Pool library that allows CPU-intensive functions to be executed inside Web Workers without manually managing worker lifecycle, task queues, serialization, or worker replacement.
 
-Unlike traditional Web Worker libraries that require dedicated worker files, Worker Pool accepts ordinary JavaScript functions and automatically executes them inside pooled workers.
+Worker Pool provides a simple function wrapping API:
 
-## Features
+```js
+const expensiveTask = wrap(function () {
+    // Heavy computation
+});
 
-- Worker pool with automatic scheduling
-- Worker reuse
-- Automatic worker creation up to `navigator.hardwareConcurrency`
-- Worker timeout protection
-- Automatic worker replacement after crashes or timeouts
-- Promise-based API
-- Named worker functions
-- Anonymous worker functions
-- TypeScript/JSDoc autocomplete support
-- Automatic function compilation cache inside every worker
+await expensiveTask();
+```
+
+The wrapped function keeps the same calling style as the original function but executes in a background worker thread.
 
 ---
 
-# Why?
+# Features
 
-JavaScript is single-threaded.
-
-Heavy computations such as:
-
-- CSV parsing
-- Image processing
-- Video processing
-- Compression
-- Encryption
-- Large JSON parsing
-- Data aggregation
-- AI inference
-
-block the UI thread, causing:
-
-- frozen interfaces
-- dropped frames
-- delayed user input
-
-Worker Pool moves these computations onto background workers while exposing an API that feels like calling ordinary async functions.
+- Automatic Web Worker creation
+- Worker pooling based on CPU cores
+- Task scheduling and queuing
+- Function serialization and caching
+- Promise-based API
+- Named worker registration
+- Automatic worker timeout protection
+- Rogue worker termination
+- Automatic worker replacement
+- TypeScript-friendly JSDoc typings
+- Zero dependencies
 
 ---
 
 # Installation
 
-Simply add the library in your importmap then import the library using its designated name.
+## Browser Import Map
+
+Add the Worker Pool module using an HTML import map:
 
 ```html
 <script type="importmap">
 {
-    "imports" : { 
-        "worker-pool" : "https://cdn.jsdelivr.net/gh/icevelez/Core@master/lib/worker-pool.js"   
+    "imports": {
+        "worker-pool": "https://cdn.jsdelivr.net/gh/icevelez/Core@master/lib/worker-pool.js"
     }
 }
 </script>
 ```
 
-```js
-import { worker } from "worker-pool";
-```
-
-or create an isolated worker pool.
+Then import:
 
 ```js
-import { create_worker } from "worker-pool";
-
-const pool = create_worker();
+import { wrap, create_worker } from "worker-pool";
 ```
 
 ---
 
 # Basic Usage
 
-## Anonymous Worker Function
+## Wrap a Function
 
 ```js
-const expensive = worker.execute(function (n) {
-    let total = 0;
+import { wrap } from "worker-pool";
 
-    for (let i = 0; i < n; i++) {
-        total += Math.sqrt(i);
+const calculate = wrap(function (number) {
+
+    let result = 0;
+
+    for (let i = 0; i < number; i++) {
+        result += Math.sqrt(i);
     }
 
-    return total;
+    return result;
+
 });
 
-const result = await expensive(50_000_000);
+
+const result = await calculate(100000000);
+
+console.log(result);
 ```
 
-Equivalent shorthand:
+The original function:
 
 ```js
-const result = await worker.execute(function (n) {
-    ...
-})(50_000_000);
+function calculate(number) {
+
+}
+```
+
+becomes:
+
+```js
+(...args) => Promise<Result>
+```
+
+The computation executes inside a Web Worker.
+
+---
+
+# How It Works
+
+The Worker Pool architecture:
+
+```
+Main Thread
+
+    |
+    |
+    |  Task
+    |
+    v
+
+Worker Pool Scheduler
+
+    |
+    |
+    +------------+
+    |            |
+    v            v
+
+Worker       Worker
+Thread       Thread
+
+    |
+    |
+    v
+
+Result
+
+    |
+    |
+    v
+
+Promise Resolve
 ```
 
 ---
 
-## Named Worker Functions
+# Worker Pool Lifecycle
 
-Named functions can be registered once and reused throughout the application.
+Workers are created dynamically.
 
-```js
-worker.register("parseCSV", function (text) {
-    ...
-});
-```
+The pool:
 
-Later:
-
-```js
-const rows = await worker.run.parseCSV(csvText);
-```
+1. Checks for available workers.
+2. Creates workers when required.
+3. Queues tasks when all workers are busy.
+4. Assigns queued tasks when workers become available.
+5. Terminates workers that exceed their maximum lifetime.
 
 ---
 
-# Chaining Registrations
+# Worker Limits
 
-`register()` returns the same WorkerPool instance allowing fluent chaining.
-
-```js
-worker
-    .register("csv", parseCSV)
-    .register("thumbnail", generateThumbnail)
-    .register("hash", sha256);
-```
-
----
-
-# TypeScript / JSDoc Autocomplete
-
-The generic types automatically infer registered functions.
+The worker count is automatically determined:
 
 ```js
-worker
-    .register("csv", parseCSV)
-    .register("resize", resizeImage);
+const MAX_WORKERS = navigator.hardwareConcurrency || 1;
 ```
-
-VS Code will autocomplete:
-
-```text
-worker.run.
-        csv(...)
-        resize(...)
-```
-
-Parameter types and return types are inferred automatically.
-
----
-
-# Executing Multiple Tasks
-
-Worker Pool automatically distributes work across available workers.
-
-```js
-await Promise.all([
-    worker.run.csv(file1),
-    worker.run.csv(file2),
-    worker.run.csv(file3),
-    worker.run.csv(file4),
-    worker.run.csv(file5)
-]);
-```
-
----
-
-# Worker Scheduling
-
-Worker Pool maintains an internal task queue.
-
-```text
-Tasks
-
-CSV #1
-CSV #2
-Resize
-Hash
-↓
-Scheduler
-↓
-Worker 1
-Worker 2
-Worker 3
-...
-```
-
-Whenever a worker becomes available, the scheduler assigns the next task.
-
----
-
-# Worker Pool Size
-
-Maximum workers default to:
-
-```js
-navigator.hardwareConcurrency
-```
-
-or
-
-```js
-1
-```
-
-if unavailable.
 
 Example:
 
-```text
-8 CPU threads
-↓
-8 workers maximum
+A CPU with:
+
+```
+8 cores
 ```
 
-Workers are created lazily.
+creates up to:
 
-No workers are created until work is scheduled.
+```
+8 workers
+```
 
 ---
 
-# Worker Lifetime
+# Function Wrapping
 
-Each running task has a maximum execution time.
+## Anonymous Functions
 
 ```js
-const MAX_WORKER_LIFE =
-    1000 * 60 * 5;
+const hash = wrap(function (data) {
+    return cryptoHash(data);
+});
+
+await hash(input);
+```
+
+---
+
+## Existing Functions
+
+```js
+function processImage(image){
+    // expensive operation
+}
+
+const workerProcess = wrap(processImage);
+
+await workerProcess(image);
+```
+
+---
+
+# Named Functions
+
+Worker Pool supports registering reusable worker functions.
+
+```js
+import { create_worker } from "worker-pool";
+
+const worker = create_worker();
+
+worker.register("fibonacci", function fibonacci(n){
+    if(n <= 1) return n;
+    return fibonacci(n-1) + fibonacci(n-2);
+});
+
+const result = await worker.run.fibonacci(40);
+```
+
+The registered function becomes available through:
+
+```js
+worker.run.<functionName>
+```
+
+---
+
+# Multiple Worker Pools
+
+You can create isolated worker pools which manages its own function registry but shares the same underlying scheduler and workers:
+
+```js
+const image_workers = create_worker();
+
+const data_workers = create_worker();
+```
+
+---
+
+# Task Execution Flow
+
+When calling:
+
+```js
+await workerTask(value);
+```
+
+The flow is:
+
+```
+Function Call
+      |
+      v
+Create Task ID
+      |
+      v
+Add to Queue
+      |
+      v
+Scheduler Finds Worker
+      |
+      v
+postMessage()
+      |
+      v
+Worker Executes Function
+      |
+      v
+postMessage(Result)
+      |
+      v
+Resolve Promise
+```
+
+---
+
+# Function Serialization
+
+Functions are transferred using:
+
+```js
+Function.prototype.toString()
+```
+
+Example:
+
+```js
+function add(a,b){
+    return a+b;
+}
+```
+
+becomes:
+
+```js
+"function add(a,b){ return a+b; }"
+```
+
+The worker reconstructs it:
+
+```js
+new Function(`return ${fn}`)();
+```
+
+The worker caches reconstructed functions:
+
+```js
+const fn_register = new Map();
+```
+
+so repeated execution does not require recompilation.
+
+---
+
+# Function Cache
+
+Example:
+
+```js
+const calculate = wrap(expensiveCalculation);
+
+await calculate(100);
+await calculate(200);
+await calculate(300);
+```
+
+The worker only compiles:
+
+```
+expensiveCalculation
+```
+
+once.
+
+Future calls reuse the cached version.
+
+---
+
+# Timeout Protection
+
+Workers have a maximum execution lifetime:
+
+```js
+const MAX_WORKER_LIFE = 1000 * 60 * 5;
 ```
 
 Default:
@@ -238,308 +354,285 @@ Default:
 5 minutes
 ```
 
-If a worker exceeds this time:
+If a worker does not respond:
 
-- it is terminated
-- the task rejects
-- a replacement worker is automatically created
-
-Example error:
-
-```text
-Worker timeout
 ```
-
----
-
-# Function Compilation Cache
-
-One of the largest overheads of dynamically executing functions inside a worker is repeatedly compiling the function source.
-
-Worker Pool avoids this.
-
-Each worker keeps an internal cache.
-
-```text
 Worker
-
-Map
-
-fn_id
-
-↓
-
-Compiled Function
+ |
+ X
+ |
+Terminate
 ```
 
-When a task arrives:
+The pool:
 
-```text
-Task
-↓
-fn_id
-↓
-Already compiled?
-↓
-YES
-↓
-Execute immediately
-```
-
-Otherwise:
-
-```text
-Compile once
-↓
-Store in Map
-↓
-Reuse forever
-```
-
-Each worker compiles every function only once during its lifetime.
+1. Terminates the worker.
+2. Rejects the pending Promise.
+3. Creates a replacement worker.
+4. Continues processing queued tasks.
 
 ---
 
-# Function IDs
+# Handling Infinite Loops
 
-Every function registered with Worker Pool receives a unique identifier.
-
-```text
-parseCSV
-↓
-fn_id = 0
-
-thumbnail
-↓
-fn_id = 1
-
-hash
-↓
-fn_id = 2
-```
-
-Instead of recompiling function source every task, workers first check:
+Example:
 
 ```js
-fn_register.has(fn_id)
+const badTask = wrap(function(){
+    while(true){}
+});
+
+
+await badTask();
 ```
 
-If the function already exists, the cached version is reused.
-
----
-
-# Execution Flow
-
-```text
-Main Thread
-↓
-worker.run.csv(file)
-↓
-Task Queue
-↓
-Scheduler
-↓
-Available Worker
-↓
-Worker receives payload
-↓
-Function cache
-↓
-Compile (first run only)
-↓
-Execute
-↓
-Return result
-↓
-Promise resolved
-```
-
----
-
-# Anonymous Function Caching
-
-Anonymous functions executed via `execute()` are cached using a `WeakMap`.
+The Worker Pool detects that the worker exceeded:
 
 ```js
-const parse = worker.execute(parseCSV);
-
-await parse(file1);
-await parse(file2);
-await parse(file3);
+MAX_WORKER_LIFE
 ```
 
-The worker wrapper is created only once.
+and terminates it.
 
-Subsequent calls reuse the cached wrapper.
+The main thread remains responsive.
 
 ---
 
 # Error Handling
 
-Worker exceptions reject the returned Promise.
+Worker errors automatically reject the Promise.
+
+Example:
 
 ```js
+const task = wrap(function(){
+    throw new Error("Something failed");
+});
+
+
 try {
-    await worker.run.csv(file);
-} catch(err){
-    console.error(err);
+    await task();
+} catch(error){
+    console.error(error);
 }
 ```
 
 ---
 
-# Worker Crashes
+# Recommended Use Cases
 
-If a worker crashes unexpectedly:
+Worker Pool is designed for CPU-heavy operations.
 
-- it is terminated
-- removed from the worker pool
-- a replacement worker is created when necessary
+Good examples:
 
----
-
-# Architecture
-
-```text
-                   Worker Pool
-
-               Task Queue
-                    │
-                    ▼
-             Scheduler
-      ┌─────────┬─────────┬─────────┐
-      ▼         ▼         ▼
-   Worker 1  Worker 2  Worker 3
-      │         │         │
-      ▼         ▼         ▼
- Function   Function   Function
-   Cache      Cache      Cache
-```
-
-Each worker owns its own function cache.
-
-Caches are **not shared** between workers.
-
-This avoids recompiling the same function on every execution while remaining compatible with the browser's isolated worker memory model.
-
----
-
-# Limitations
-
-Functions should be self-contained.
-
-Good:
+## Data Processing
 
 ```js
-function add(a, b) {
-    return a + b;
-}
+await parseLargeJSON(data);
 ```
 
-Bad:
+## CSV Processing
 
 ```js
-const multiplier = 5;
-
-function multiply(x) {
-    return x * multiplier;
-}
+await parseCSV(file);
 ```
 
-The worker cannot access variables from the main thread's lexical scope.
+## Image Processing
+
+```js
+await resizeImage(bitmap);
+```
+
+## Cryptography
+
+```js
+await calculateHash(buffer);
+```
+
+## Compression
+
+```js
+await compress(data);
+```
+
+## Physics Simulation
+
+```js
+await simulate(world);
+```
 
 ---
 
-# Suitable Workloads
+# Not Recommended
 
-Worker Pool is best suited for CPU-intensive operations.
+Do not use Worker Pool for small operations:
 
-Examples include:
+```js
+await wrap(x => x + 1)(1);
+```
 
-- CSV parsing
-- Spreadsheet import
-- Image decoding
-- Thumbnail generation
-- Compression
-- Encryption
-- Hashing
-- Large JSON processing
-- Data aggregation
-- Mathematical simulations
-- Physics calculations
-- AI inference
-- Audio processing
-- Video frame processing
+The overhead of:
+
+- creating messages
+- switching threads
+- resolving promises
+
+may exceed the computation time.
 
 ---
 
-# Not Suitable For
+# Data Transfer
 
-Worker Pool should generally not be used for:
+Worker communication uses the browser structured clone algorithm.
 
-- DOM manipulation
-- Browser APIs tied to the main thread
-- Small computations
-- Event handlers
-- Simple array filtering
-- Frequent tiny tasks
+Supported:
 
-The cost of sending data to workers may outweigh any performance gain for lightweight work.
+- Objects
+- Arrays
+- Strings
+- Numbers
+- Blobs
+- ArrayBuffers
+- TypedArrays
+
+Example:
+
+```js
+await process(blob);
+```
 
 ---
 
 # API Reference
 
-## `worker.register(name, fn)`
+## `wrap(fn)`
 
-Registers a reusable named worker function.
-
-```js
-worker.register("csv", parseCSV);
-```
-
-Returns:
+Wraps a function for execution in the worker pool.
 
 ```ts
-WorkerPool
+wrap<T extends Function>(fn:T) : (...args:Parameters<T>) => Promise<ReturnType<T>>
 ```
 
----
-
-## `worker.run`
-
-Invokes registered worker functions.
+Example:
 
 ```js
-await worker.run.csv(file);
-```
+const workerFn = wrap(compute);
 
----
-
-## `worker.execute(fn)`
-
-Creates a worker-backed wrapper around an anonymous function.
-
-```js
-const parse = worker.execute(parseCSV);
-
-await parse(file);
-```
-
-Returns:
-
-```ts
-(...args) => Promise<Result>
+await workerFn(data);
 ```
 
 ---
 
 ## `create_worker()`
 
-Creates an independent WorkerPool instance.
+Creates a new isolated worker pool.
 
 ```js
 const pool = create_worker();
 ```
 
-Useful for creating isolated registries between modules or applications.
+---
+
+## `pool.register(name, fn)`
+
+Registers a named worker function.
+
+Example:
+
+```js
+pool.register("compress", compress);
+```
+
+---
+
+## `pool.run.name`
+
+Executes a registered function.
+
+Example:
+
+```js
+await pool.run.compress(data);
+```
+
+---
+
+# Limitations
+
+Because functions are serialized:
+
+## Closures are not preserved
+
+This will not work:
+
+```js
+const value = 10;
+
+wrap(() => {
+    return value;
+});
+```
+
+The worker does not have access to:
+
+```js
+value
+```
+
+Pass values as parameters instead:
+
+```js
+wrap((value)=>{
+    return value;
+})(10);
+```
+
+---
+
+## DOM Access
+
+Workers cannot access:
+
+```js
+document
+window
+HTMLElement
+```
+
+Worker functions must be pure computation.
+
+---
+
+# Design Philosophy
+
+Worker Pool follows the principle:
+
+> Keep the main thread responsible for UI and coordination. Move expensive computation to background workers.
+
+Instead of manually managing:
+
+- Worker creation
+- Message IDs
+- Promise resolution
+- Worker replacement
+- Scheduling
+
+developers interact with normal JavaScript functions.
+
+The library transforms:
+
+```js
+function(data){
+    return heavyComputation(data);
+}
+```
+
+into:
+
+```js
+async function(data){
+    return WorkerExecution(data);
+}
+```
+
+without changing the developer experience.
