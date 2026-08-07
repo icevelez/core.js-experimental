@@ -1,14 +1,114 @@
 <script>
-    import { signal, bind } from "core";
+    import { signal, on_mount } from "core";
+    import { wrap } from "worker-pool";
+
+    /**
+     * @param {File} file
+     */
+    async function parse_csv_fn(file) {
+        const stream = file.stream().pipeThrough(new TextDecoderStream());
+        const reader = stream.getReader();
+        const delimiter = ",";
+        const rows = [];
+
+        let fieldAccumulator = '';
+        let currentRow = [];
+        let inQuotes = false;
+        let length;
+
+        while (true) {
+            const { value: chunk, done } = await reader.read();
+
+            if (done) {
+                if (fieldAccumulator.length > 0 || currentRow.length > 0) {
+                    currentRow.push(fieldAccumulator);
+                    rows.push(currentRow);
+                }
+                break;
+            }
+
+            for (let i = 0; i < chunk.length; i++) {
+                const char = chunk[i];
+                const nextChar = chunk[i + 1];
+
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        // Escaped quote inside quoted field ("")
+                        fieldAccumulator += '"';
+                        i++; // Skip second quote
+                    } else {
+                        // Toggle quote state
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === delimiter && !inQuotes) {
+                    // Field end
+                    currentRow.push(fieldAccumulator);
+                    fieldAccumulator = '';
+                } else if ((char === '\r' || char === '\n') && !inQuotes) {
+                    // Line end (outside quotes)
+                    if (char === '\r' && nextChar === '\n') {
+                        i++; // Skip \n in \r\n
+                    }
+
+                    // Push final field and yield row
+                    currentRow.push(fieldAccumulator);
+                    rows.push(currentRow);
+
+                    // Reset state for next row
+                    fieldAccumulator = '';
+                    if (!length) length = currentRow.length;
+                    currentRow = [];
+                } else {
+                    fieldAccumulator += char;
+                }
+            }
+        }
+
+        return rows;
+    }
+
+    const worker_parse_csv = wrap(parse_csv_fn);
 
     export default function() {
 
-        const [name, setName] = signal("John");
         const [count, setCount] = signal(0);
 
+        let file_input_element;
+        const setup_file_input_element = (node) => file_input_element = node;
+
+        async function parse_files() {
+            const files = Array.from(file_input_element?.files || []);
+            if (files.length <= 0) return;
+
+            console.time("Main Thread");
+            console.log(await Promise.all(files.map(parse_csv_fn)));
+            console.timeEnd("Main Thread");
+        }
+
+        async function parse_files_worker() {
+            const files = Array.from(file_input_element?.files || []);
+            if (files.length <= 0) return;
+
+            console.time("Worker Thread");
+            console.log(await Promise.all(files.map(worker_parse_csv)));
+            console.timeEnd("Worker Thread");
+        }
+
+        on_mount(() => {
+            const timer = setInterval(() => {
+                setCount(count()+1)
+            }, 250)
+
+            return () => {
+                clearInterval(timer);
+            }
+        })
     }
 </script>
 
-<h1>Hello {{ name() }}</h1>
-<input on:input="(e) => setName(e.target.value)" :value="name()">
-<button on:click="() => setCount(count()+1)">Count: {{ count() }}</button>
+
+<h1>Hello! upload CSVs here</h1>
+<input use:setup_file_input_element type="file" accept="text/csv" multiple>
+<button on:click="parse_files_worker">Click to parse using Worker Pool</button>
+<button on:click="parse_files">Click to parse using Main thread</button>
+<h1>Counter: {{ count() }}</h1>
