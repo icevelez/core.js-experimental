@@ -135,7 +135,7 @@ const parse = {
  * @param {string} text
  */
 function replace_node_with_anchor(node, text) {
-    const anchor = CORE.show_anchor_blocks ? new Comment(text) : new Text("");
+    const anchor = CORE.show_anchor_blocks ? new Comment(text) : new Text(" ");
     node.parentNode.replaceChild(anchor, node);
 }
 

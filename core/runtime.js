@@ -169,7 +169,7 @@ export const CORE = Object.freeze({
         let existing_dispose_blocks = [];
 
         const fragment = document.createDocumentFragment();
-        const start_node = CORE.show_anchor_blocks ? new Comment("each-block-start") : new Text("");
+        const start_node = CORE.show_anchor_blocks ? new Comment("each-block-start") : new Text(" ");
         anchor.before(start_node);
 
         const effect_dispose = CORE.effect(() => {
