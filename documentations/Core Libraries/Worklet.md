@@ -1,8 +1,8 @@
-# Worker Pool
+# Worklet
 
-A lightweight JavaScript Worker Pool library that allows CPU-intensive functions to be executed inside Web Workers without manually managing worker lifecycle, task queues, serialization, or worker replacement.
+A lightweight JavaScript Worklet library that allows CPU-intensive functions to be executed inside Web Workers without manually managing worker lifecycle, task queues, serialization, or worker replacement.
 
-Worker Pool provides a simple function wrapping API:
+Worklet provides a simple function wrapping API:
 
 ```js
 const expensiveTask = wrap(function () {
@@ -36,13 +36,13 @@ The wrapped function keeps the same calling style as the original function but e
 
 ## Browser Import Map
 
-Add the Worker Pool module using an HTML import map:
+Add the Worklet module using an HTML import map:
 
 ```html
 <script type="importmap">
 {
     "imports": {
-        "worker-pool": "https://cdn.jsdelivr.net/gh/icevelez/Core@master/lib/worker-pool.js"
+        "worker-pool": "https://cdn.jsdelivr.net/gh/icevelez/Core@master/lib/worklet.js"
     }
 }
 </script>
@@ -101,7 +101,7 @@ The computation executes inside a Web Worker.
 
 # How It Works
 
-The Worker Pool architecture:
+The Worklet architecture:
 
 ```
 Main Thread
@@ -109,7 +109,7 @@ Main Thread
     |  Task
     |
     v
-Worker Pool Scheduler
+Worklet Scheduler
     |
     +------------+
     |            |
@@ -126,7 +126,7 @@ Promise Resolve
 
 ---
 
-# Worker Pool Lifecycle
+# Worklet Lifecycle
 
 Workers are created dynamically.
 
@@ -142,7 +142,7 @@ The pool:
 
 # Automatic Worker Pooling
 
-Worker Pool automatically creates workers based on available CPU cores.
+Worklet creates workers based on available CPU cores.
 
 ```js
 const MAX_WORKERS =
@@ -187,7 +187,7 @@ await workerProcess(image);
 
 # Named Functions
 
-Worker Pool supports registering reusable worker functions.
+Worklet supports registering reusable worker functions.
 
 ```js
 import { create_worker } from "worker-pool";
@@ -212,7 +212,7 @@ worker.run.<functionName>
 
 # Multiple Worker
 
-You can create isolated worker pools which manages its own function registry but shares the same underlying scheduler and workers:
+You can create isolated Worklets which manages its own function registry but shares the same underlying scheduler and workers:
 
 ```js
 const image_workers = create_worker();
@@ -477,7 +477,7 @@ If a worker unexpectedly crashes:
 worker.onerror
 ```
 
-Worker Pool:
+Worklet:
 
 1. Rejects the active Promise
 2. Removes the worker
@@ -487,7 +487,7 @@ Worker Pool:
 
 # Recommended Use Cases
 
-Worker Pool is designed for CPU-heavy operations.
+Worklet is designed for CPU-heavy operations.
 
 Good examples:
 
@@ -552,7 +552,7 @@ The main thread remains responsive.
 
 # Parallel Execution Example
 
-Without Worker Pool:
+Without Worklet:
 
 ```js
 await Promise.all([
@@ -576,7 +576,7 @@ The UI may freeze.
 
 ---
 
-With Worker Pool:
+With Worklet:
 
 ```js
 await Promise.all([
@@ -612,7 +612,7 @@ The browser remains responsive.
 
 # Not Recommended
 
-Do not use Worker Pool for small operations:
+Do not use Worklet for small operations:
 
 ```js
 await wrap(x => x + 1)(1);
@@ -654,7 +654,7 @@ await process(blob);
 
 ## `wrap(fn)`
 
-Wraps a function for execution in the worker pool.
+Wraps a function for execution in a Worklet.
 
 ```ts
 wrap<T extends Function>(fn:T) : (...args:Parameters<T>) => Promise<ReturnType<T>>
@@ -672,7 +672,7 @@ await workerFn(data);
 
 ## `create_worker()`
 
-Creates a new isolated worker pool.
+Creates a new isolated Worklet.
 
 ```js
 const pool = create_worker();
@@ -752,7 +752,7 @@ Worker functions must be pure computation.
 
 # Design Philosophy
 
-Worker Pool follows the principle:
+Worklet follows the principle:
 
 > Keep the main thread responsible for UI and coordination. Move expensive computation to background workers.
 
