@@ -42,7 +42,7 @@ Add the Worklet module using an HTML import map:
 <script type="importmap">
 {
     "imports": {
-        "worker-pool": "https://cdn.jsdelivr.net/gh/icevelez/Core@master/lib/worklet.js"
+        "worklet": "https://cdn.jsdelivr.net/gh/icevelez/Core@master/lib/worklet.js"
     }
 }
 </script>
@@ -51,7 +51,7 @@ Add the Worklet module using an HTML import map:
 Then import:
 
 ```js
-import { wrap, create_worker } from "worker-pool";
+import { wrap, create_worker } from "worklet";
 ```
 
 ---
@@ -61,7 +61,7 @@ import { wrap, create_worker } from "worker-pool";
 ## Wrap a Function
 
 ```js
-import { wrap } from "worker-pool";
+import { wrap } from "worklet";
 
 const calculate = wrap(function (number) {
 
@@ -190,7 +190,7 @@ await workerProcess(image);
 Worklet supports registering reusable worker functions.
 
 ```js
-import { create_worker } from "worker-pool";
+import { create_worker } from "worklet";
 
 const worker = create_worker();
 
