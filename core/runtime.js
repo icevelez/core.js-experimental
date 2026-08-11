@@ -1,3 +1,9 @@
+// @ts-check
+
+/** @typedef {{ __events: Record<string, Function[]>, __cacheAttr: Record<string, any>, __cacheText: string, }} CoreAttribute */
+/** @typedef {Node & CoreAttribute} Element */
+/** @typedef {HTMLInputElement & CoreAttribute} InputElement */
+
 /** @typedef {(props:Record<string, any>) => (() => void)} CoreComponent the function that wraps both the data and render function */
 
 /** @typedef {{ fns : string[], exprs : string[] }} IfBlock */
@@ -8,7 +14,7 @@
 
 /** @typedef {IfBlock | EachBlock | AwaitBlock | PropsBlock | CoreComponent} BlockCache */
 
-/** @type {any | null} */
+/** @type {any} */
 let arg_global = null;
 
 export const CORE = Object.freeze({
@@ -27,7 +33,7 @@ export const CORE = Object.freeze({
     create_new_context,
     /** @type {DocumentFragment[]} */
     fragment_cache: [],
-    /** @type {Map<string, BlockCache[]>} */
+    /** @type {Map<string, BlockCache>} */
     block_cache: new Map(),
     /** @type {{ [key:string] : Boolean }} */
     delegated_events: Object.create(null),
@@ -41,7 +47,7 @@ export const CORE = Object.freeze({
         return template.content;
     },
     /**
-     * @param {Node} node
+     * @param {Element} node
      * @param {string} text
      */
     set_text: function (node, text) {
@@ -53,11 +59,14 @@ export const CORE = Object.freeze({
         arg_global = null;
         return args;
     },
+    /**
+     * @param  {any[]} args
+     */
     set_param_args: function (...args) {
         arg_global = args;
     },
     /**
-     * @param {Node} node
+     * @param {InputElement} node
      * @param {any} value
      * @param {string} property
      */
@@ -79,15 +88,19 @@ export const CORE = Object.freeze({
     },
     /**
      * @param {string} event_name
-     * @param {Node} node
+     * @param {Element} node
      * @param {Function} func
-     * @returns {() => void} remove event
      */
     delegate: function (event_name, node, func) {
         if (typeof func !== "function") throw new Error("[Core runtime]: Event delegation error! function is not a function");
 
         if (!CORE.delegated_events[event_name]) {
-            window.addEventListener(event_name, (e) => match_delegated_node(e, e.target, event_name));
+            window.addEventListener(event_name, (e) => {
+                /** @type {any} */
+                const element = e.target;
+                if (!element) return console.warn("[Core runtime]: event delegation target is null");
+                match_delegated_node(e, element, event_name)
+            });
             CORE.delegated_events[event_name] = true;
         }
 
@@ -96,6 +109,7 @@ export const CORE = Object.freeze({
         node.__events[event_name].push(func);
     },
     /**
+     * @param {Node} parentNode
      * @param {Node} startNode
      * @param {Node} endNode
      */
@@ -107,8 +121,10 @@ export const CORE = Object.freeze({
             return;
         }
 
+        /** @type {Node | null} */
         let node = startNode;
         while (node && node !== endNode) {
+            /** @type {Node | null} */
             const next = node.nextSibling;
             parentNode.removeChild(node);
             node = next;
@@ -117,15 +133,17 @@ export const CORE = Object.freeze({
         parentNode.removeChild(endNode);
     },
     /**
-     * Returns a function to dispose DOM nodes and reactive bindings
-     * @param {Node} anchor
+     * @param {HTMLElement} anchor
      * @param {(() => Boolean)[]} condition_fns
      * @param {(() => (() => void))[]} fns
      */
     if: function (anchor, condition_fns, fns) {
         const fragment = document.createDocumentFragment();
 
-        let prev_fn, dispose;
+        /** @type {Function | undefined} */
+        let prev_fn;
+        /** @type {Function} */
+        let dispose;
 
         const effect_dispose = CORE.effect(() => {
             let curr_fn;
@@ -158,14 +176,15 @@ export const CORE = Object.freeze({
         }
     },
     /**
-     * Returns a function to dispose DOM nodes and reactive bindings
-     * @param {Node} anchor
+     * @param {HTMLElement} anchor
      * @param {() => any[]} arr_fn
-     * @param {() => (() => void)} then_fn
+     * @param {(value:() => any, index:number) => (() => void)} then_fn
      * @param {() => (() => void)} else_fn
      */
     each: function (anchor, arr_fn, then_fn, else_fn) {
+        /** @type {Function | null} */
         let else_block_dispose_fn = null;
+        /** @type {Function[]} */
         let existing_dispose_blocks = [];
 
         const fragment = document.createDocumentFragment();
@@ -174,12 +193,15 @@ export const CORE = Object.freeze({
 
         const effect_dispose = CORE.effect(() => {
             try {
+                /** @type {any} */
                 const arr = arr_fn();
 
-                if (!arr || arr?.length <= 0) {
+                if (!arr || arr?.length <= 0 || arr?.size <= 0) {
                     if (existing_dispose_blocks.length > 0) {
                         const parent_node = anchor.parentNode;
-                        CORE.remove_nodes(parent_node, start_node.nextSibling, anchor.previousSibling);
+                        const next = start_node.nextSibling;
+                        const end = anchor.previousSibling;
+                        if (parent_node && next && end) CORE.remove_nodes(parent_node, next, end);
                     }
 
                     for (const dispose of existing_dispose_blocks) dispose();
@@ -187,7 +209,7 @@ export const CORE = Object.freeze({
 
                     if (!else_fn || else_block_dispose_fn) return;
                     CORE.set_param_args(fragment);
-                    else_block_dispose_fn = each_block.else_fn();
+                    else_block_dispose_fn = else_fn();
                     anchor.before(fragment);
                     run_deferred_mount_fns();
                     return;
@@ -201,7 +223,7 @@ export const CORE = Object.freeze({
                 const new_each_dispose_blocks = [];
 
                 const is_array = Array.isArray(arr);
-                const is_map_or_set = arr instanceof Map || arr instanceof Set;
+                const is_map = arr instanceof Map;
 
                 let i = -1;
                 for (const ar of arr) {
@@ -214,7 +236,7 @@ export const CORE = Object.freeze({
 
                     CORE.set_param_args(fragment);
                     const index = i; // snapshot of i
-                    const dispose = then_fn(is_array ? (() => arr[index]) : is_map_or_set ? (() => arr.get(ar)) : () => ar, index);
+                    const dispose = then_fn(is_array ? (() => arr[index]) : is_map ? (() => arr.get(ar)) : () => ar, index);
                     new_each_dispose_blocks.push(dispose);
                 }
 
@@ -244,15 +266,18 @@ export const CORE = Object.freeze({
     },
     /**
      * Returns a function to dispose DOM nodes and reactive bindings
-     * @param {Node} anchor
+     * @param {HTMLElement} anchor
      * @param {() => Promise<any>} await_fn
      * @param {() => (() => void)} pending_fn
-     * @param {() => ((value:any) => void)} then_fn
-     * @param {() => (() => void)} catch_fn
+     * @param {(value:any) => ((value:any) => void)} then_fn
+     * @param {(value:any) => (() => void)} catch_fn
      */
     await: function (anchor, await_fn, pending_fn, then_fn, catch_fn) {
+        /** @type {Function | null} */
         let pending_dispose_fn;
+        /** @type {Function | null} */
         let dispose_fn;
+        /** @type {number} */
         let last_id;
 
         const dispose = () => {
@@ -300,8 +325,11 @@ export const CORE = Object.freeze({
 
                 set_new_context(old_context);
 
-                pending_dispose_fn();
-                pending_dispose_fn = null;
+                if (pending_dispose_fn) {
+                    pending_dispose_fn();
+                    pending_dispose_fn = null;
+                }
+
                 anchor.before(fragment);
                 run_deferred_mount_fns();
             })
@@ -310,14 +338,14 @@ export const CORE = Object.freeze({
         }, { track_inner_effect: false });
 
         return () => {
-            dispose_fn();
+            if (dispose_fn) dispose_fn();
             effect_dispose();
             set_new_context(context);
         }
     },
     /**
      * Returns a function to dispose DOM nodes and reactive bindings
-     * @param {Node} anchor
+     * @param {HTMLElement} anchor
      * @param {Function | { default : Function }} fn
      * @param {any} props
      * @param {Function} slot_fn
@@ -325,12 +353,16 @@ export const CORE = Object.freeze({
     core_component: function (anchor, fn, props, slot_fn) {
         const fragment = document.createDocumentFragment();
         CORE.set_param_args(fragment, slot_fn);
-        const dispose = (fn.default ? fn.default : fn)(props);
+        const dispose = typeof fn === "function" ? fn(props) : fn.default(props);
         anchor.before(fragment);
         return dispose;
     },
+    /**
+     * @param {string} id
+     */
     resolve_components: async function (id) {
         const component_promises = current_component_promises;
+        if (!component_promises) return;
         current_component_promises = null;
         const keys = Object.keys(component_promises || Object.create(null));
         const components = Object.create(component_promises || null);
@@ -345,25 +377,31 @@ export const CORE = Object.freeze({
 
 /**
  * @param {Event} event
- * @param {Node} target
- * @param {string} event_name,
+ * @param {Element} target
+ * @param {string} event_name
  */
 function match_delegated_node(event, target, event_name) {
     const fns = target.__events ? target.__events[event_name] : null;
-    if (!fns) return target.parentNode ? match_delegated_node(event, target.parentNode, event_name) : undefined;
+    if (!fns) {
+        /** @type {any} */
+        const parent = target.parentNode;
+        if (!parent) return;
+        return match_delegated_node(event, parent, event_name);
+    }
     for (const fn of fns) fn(event);
 }
 
-/** @type {Map<string, (Promise<Function> | Function)>} */
+/** @type {Map<string, (Promise<CoreComponent> | CoreComponent)>} */
 const component_cache = new Map();
 
 /**
  * @param {string} url
- * @returns {Promise<Function> | Function}
+ * @returns {Promise<CoreComponent> | CoreComponent}
  */
 export function component(url) {
     const full_url = (new URL(url.startsWith("http") ? url : `${window.location.origin}${url.startsWith("/") ? url : `/${url}`}`)).toString();
-    if (component_cache.has(full_url)) return component_cache.get(full_url);
+    const cache_component = component_cache.get(full_url);
+    if (cache_component) return cache_component;
 
     const promise = new Promise(async (resolve, reject) => {
         const response = await fetch(url, { headers : { "x-core" : "core-component" }}); // the header is a tag for Core Server to look to indicate this resource can be compiled
@@ -383,7 +421,8 @@ export function component(url) {
             return;
         }
 
-        const [text, core_compiler] = await Promise.all([response.text(), import("core-compiler")]);
+        const core_compiler_name = "core-compiler";
+        const [text, core_compiler] = await Promise.all([response.text(), import(core_compiler_name)]);
         const render_function = await core_compiler.component(text, full_url);
 
         component_cache.set(full_url, render_function);
@@ -396,14 +435,21 @@ export function component(url) {
     return promise;
 }
 
+/** @type {Record<string, Promise<any>> | null} */
 let current_component_promises;
 
-export const define_components = (component_promises) => current_component_promises = component_promises;
+/** @type {(component_promises:Record<string, Promise<any>>) => void} */
+export const define_components = (component_promises) => { current_component_promises = component_promises };
 
-window.__core__ = CORE;
+/** @type {any} DO NOT DELETE THIS LINE, THIS IS THE LIFELINE OF THE COMPILED COMPONENTS */
+const self = window;
+self.__core__ = CORE;
 
 // CONTEXT API
 
+/** @typedef {Record<string | number | symbol, any>} Context */
+
+/** @type {Context} */
 const root_context = Object.create(null);
 let current_context = root_context;
 
@@ -411,16 +457,27 @@ function create_new_context() {
     return Object.create(current_context);
 }
 
+/**
+ * @param {Context} context
+ */
 function set_new_context(context) {
     const old_context = current_context;
     current_context = context;
     return old_context;
 }
 
+/**
+ * @param {any} key
+ * @param {any} value
+ */
 export function set_context(key, value) {
     current_context[key] = value;
 }
 
+/**
+ * @param {any} key
+ * @returns {any}
+ */
 export function get_context(key) {
     return current_context[key];
 }
@@ -428,10 +485,16 @@ export function get_context(key) {
 // LIFECYCLE API
 
 export async function init() {
-    /** @type {Map<string, Function>} */
+    /** @type {Map<string | number, Function>} */
     const core_components = new Map();
 
-    await Promise.all(Array.from(document.querySelectorAll("template[core-src]")).map(async (template, i) => {
+    await Promise.all(Array.from(document.querySelectorAll("template[core-src]")).map(async (value, i) => {
+        // This is some stupid TypeScript hack because TypeScript can't enforce "HTMLTemplateElement" to "globalThis.Element"
+        /** @type {any} */
+        const element = value;
+        /** @type {HTMLTemplateElement} */
+        const template = element;
+
         const src = template.getAttribute("core-src") || "";
         const id = template.id || "";
         if (!src) return;
@@ -463,10 +526,11 @@ export function mount(app, target, should_replace) {
     set_new_context(context);
     CORE.set_param_args(should_replace ? fragment : typeof target === "string" ? document.querySelector(target) : target);
 
-    const dispose = app();
+    const dispose = app(Object.create(null));
 
     if (should_replace) {
         target.before(fragment);
+        if (!target?.parentElement) throw new Error("[Core init] target doesn't have a parent element");
         target.parentElement.removeChild(target);
     }
 
@@ -481,6 +545,7 @@ export function mount(app, target, should_replace) {
     };
 }
 
+/** @type {Context[]} */
 const deferred_mount_fns = [];
 
 function run_deferred_mount_fns() {
@@ -489,10 +554,16 @@ function run_deferred_mount_fns() {
     deferred_mount_fns.length = 0;
 }
 
+/**
+ * @param {Context} context
+ */
 function defer_mounting(context) {
     deferred_mount_fns.push(context);
 }
 
+/**
+ * @param {Context} context
+ */
 function run_mount_fns(context) {
     for (const fn of context[CORE.MOUNT_FNS]) {
         try {
@@ -506,6 +577,9 @@ function run_mount_fns(context) {
     context[CORE.MOUNT_FNS].length = 0;
 }
 
+/**
+ * @param {Context} context
+ */
 function run_destroy_fns(context) {
     for (const fn of context[CORE.DESTROY_FNS]) {
         try {
@@ -518,10 +592,16 @@ function run_destroy_fns(context) {
     context[CORE.DESTROY_FNS].length = 0;
 }
 
+/**
+ * @param {Function} fn
+ */
 export function on_mount(fn) {
     current_context[CORE.MOUNT_FNS].push(fn);
 }
 
+/**
+ * @param {Function} fn
+ */
 export function on_destroy(fn) {
     current_context[CORE.DESTROY_FNS].push(fn);
 }
@@ -529,15 +609,18 @@ export function on_destroy(fn) {
 
 // REACTIVITY
 
-/** @type {Function[]} */
+/** @typedef {Set<Effect>} Dep */
+/** @typedef {Function & { deps : Dep[], children : Function[], track_inner_effect : boolean, is_priority : boolean, dispose : Function }} Effect */
+
+/** @type {Effect[]} */
 let effect_stack = [];
-/** @type {Function | null} */
+/** @type {Effect | null} */
 let current_effect = null;
 
 let dep_map = new WeakSet();
-/** @type {Function[]} */
+/** @type {Effect[]} */
 const prio_effect_queue = [];
-/** @type {Function[]} */
+/** @type {Effect[]} */
 const effect_queue = [];
 /** @type {Function[]} */
 const ticks = [];
@@ -549,7 +632,7 @@ export function next_tick() {
 }
 
 /**
- * @param {Set<Function>} dep
+ * @param {Dep} dep
  */
 function track(dep) {
     if (!current_effect || dep.has(current_effect)) return;
@@ -558,7 +641,7 @@ function track(dep) {
 }
 
 /**
- * @param {Set<Function>} dep
+ * @param {Dep} dep
  */
 function trigger(dep) {
     if (dep_map.has(dep)) return;
@@ -584,7 +667,7 @@ function trigger(dep) {
 }
 
 /**
- * @param {{ deps : Set<Function>, children : Set<Function> }[]} effect_fn
+ * @param {Effect} effect_fn
  */
 function dispose_deps(effect_fn) {
     for (const dep of effect_fn.deps) dep.delete(effect_fn);
@@ -597,11 +680,12 @@ function dispose_deps(effect_fn) {
 /**
  * Returns a dispose function for manually disposal of effect
  * @param {Function} fn
- * @param {{ track_inner_effect : boolean, is_priority : boolean }} options
+ * @param {{ track_inner_effect?: boolean, is_priority?: boolean }} options
  */
 export function effect(fn, options = { track_inner_effect : true, is_priority : false }) {
     if (typeof fn !== "function") throw new Error("[Core reactivity]: effect callback is not a function");
 
+    /** @type {Function | null} */
     let dispose_fn = null;
     let active = true;      // flag to prevent effect re-run if already dispose
 
@@ -636,10 +720,10 @@ export function effect(fn, options = { track_inner_effect : true, is_priority : 
         }
     };
 
-    wrapped.is_priority = options.is_priority;
-    wrapped.track_inner_effect = options.track_inner_effect;
+    wrapped.is_priority = Boolean(options.is_priority);
+    wrapped.track_inner_effect = Boolean(options.track_inner_effect);
 
-    /** @type {Set<Function>[]} */
+    /** @type {Dep[]} */
     wrapped.deps = [];
     /** @type {Function[]} */
     wrapped.children = [];
@@ -661,8 +745,11 @@ export function effect(fn, options = { track_inner_effect : true, is_priority : 
  * @param {T} initial_value
  */
 export function signal(initial_value) {
+    /** @type {T} */
     let value = initial_value;
+    /** @type {Container | null} */
     let container = null;
+    /** @type {any} */
     let proxy = null;
 
     const dep = new Set();
