@@ -743,6 +743,7 @@ export function effect(fn, options = { track_inner_effect : true, is_priority : 
 /**
  * @template {any} T
  * @param {T} initial_value
+ * @returns {[() => T, (new_value:T) => void]}
  */
 export function signal(initial_value) {
     /** @type {T} */
@@ -755,8 +756,11 @@ export function signal(initial_value) {
     const dep = new Set();
 
     if (is_plain_object(initial_value)) {
-        const is_proxy = initial_value[IS_PROXY];
-        if (is_proxy) value = initial_value[CONTAINER].value;
+        /** @type {any} */
+        const initial_value_cast = initial_value;
+
+        const is_proxy = initial_value_cast[IS_PROXY];
+        if (is_proxy) value = initial_value_cast[CONTAINER].value;
         container = create_container(value, dep);
         proxy = create_proxy(container);
     }
@@ -773,10 +777,15 @@ export function signal(initial_value) {
         if (typeof new_value === "function") new_value = new_value(value);
 
         if (is_plain_object(new_value)) {
-            const is_proxy = new_value[IS_PROXY];
-            const real_value = is_proxy ? new_value[CONTAINER].value : new_value;
+            /** @type {any} */
+            const new_value_cast = initial_value;
 
-            value = null;
+            const is_proxy = new_value_cast[IS_PROXY];
+            const real_value = is_proxy ? new_value_cast[CONTAINER].value : new_value;
+
+            /** @type {any} casting to satisfy TypeScript */
+            const null_value = null;
+            value = null_value;
 
             if (!container) {
                 container = create_container(real_value, dep);
@@ -803,15 +812,21 @@ export function signal(initial_value) {
     return [read, set];
 }
 
+/**
+ * @template {any} T
+ * @param {() => T} fn
+ */
 export function memo(fn) {
-    const [value, setValue] = signal();
+    /** @type {any} casting to satisfy TypeScript */
+    const null_value = null;
+    const [value, setValue] = signal(null_value);
     effect(() => setValue(fn()), { is_priority : true });
     return value;
 }
 
 /**
  * @template {any} T
- * @template {Record<string, (state:T, ...args:any[]) => (T | Promise<T>)> | (value:T) => (T | Promise<T>)} A
+ * @template {Record<string, (state:T, ...args:any[]) => (T | Promise<T>)> | ((value:T) => (T | Promise<T>))} A
  *
  * @param {T} initial_value Initial state value.
  * @param {A} actions_or_refine_fn Object containing action functions or refine function that either or both validate and transform the data
@@ -832,12 +847,19 @@ export function memo(fn) {
  * 4. Bound actions or State setter
  */
 export function managed_signal(initial_value, actions_or_refine_fn) {
+    /** @type {any} casting to satisfy TypeScript */
+    const null_value = null;
+
     const [value, set_value] = signal(initial_value);
-    const [error, set_error] = signal(null);
+    const [error, set_error] = signal(null_value);
     const [pending, set_pending] = signal(false);
 
     if (typeof actions_or_refine_fn === "function") {
+        /** @type {Function} */
         const refine_fn = actions_or_refine_fn;
+        /**
+         * @param {T} new_value
+         */
         const set_refine_value = (new_value) => {
             try {
                 set_error(null);
@@ -849,14 +871,20 @@ export function managed_signal(initial_value, actions_or_refine_fn) {
             }
         }
 
-        return [value, error, pending, set_refine_value];
+        /** @type {any} */
+        const set_refine_value_cast = set_refine_value;
+
+        return [value, error, pending, set_refine_value_cast];
     }
 
-    const actions = actions_or_refine_fn;
+    /** @type {Record<string, Function>} to satisfy TypeScript */
+    const actions_cast = actions_or_refine_fn;
+    const actions = actions_cast;
     const action_keys = Object.keys(actions);
+    /** @type {Record<string, (...args:any[]) => void>} */
     const defined_actions = Object.create(actions);
 
-    for (const key of action_keys) defined_actions[key] = function (...args) {
+    for (const key of action_keys) defined_actions[key] = function (/** @type {any[]} */...args) {
         try {
             const result = actions[key](value(), ...args);
             if (!(result instanceof Promise)) return set_value(result);
@@ -874,7 +902,10 @@ export function managed_signal(initial_value, actions_or_refine_fn) {
         }
     }
 
-    return [value, error, pending, defined_actions];
+    /** @type {any} */
+    const defined_actions_cast = defined_actions;
+
+    return [value, error, pending, defined_actions_cast];
 }
 
 const array_mutation_keys = new Set(["push","pop","shift","unshift","splice","sort","reverse","fill","copyWithin"]);
@@ -882,10 +913,17 @@ const array_mutation_keys = new Set(["push","pop","shift","unshift","splice","so
 const IS_PROXY = Symbol("proxy");
 const CONTAINER = Symbol("container");
 
+/** @type {(v:any) => boolean} */
 const is_plain_object = (v) => v && typeof v === 'object' && ((Object.getPrototypeOf(v) === null || Object.getPrototypeOf(v) === Object.prototype) || Array.isArray(v));
 
 /** @typedef {ReturnType<typeof create_container>} Container */
 
+/**
+ *
+ * @param {any} object
+ * @param {Dep | null} [parent_dep=null]
+ * @returns
+ */
 function create_container(object, parent_dep) {
     return {
         value: object,
@@ -898,8 +936,13 @@ function create_container(object, parent_dep) {
 /** @type {WeakMap<Object, Container>} */
 const object_to_container = new WeakMap();
 const handler = {
+    /**
+     * @param {Record<any, any>} target
+     * @param {any} key
+     */
     get(target, key) {
         const container = object_to_container.get(target);
+        if (!container) throw new Error("[Core reactivity] Proxy container doesn't exists");
 
         if (key === IS_PROXY) return true;
         if (key === CONTAINER) return container;
@@ -916,7 +959,7 @@ const handler = {
             if (!Array.isArray(target)) return value;
 
             // Trigger update when target is an array and is being mutated
-            return (...args) => {
+            return (/** @type {any[]} */...args) => {
                 const result = target[key](...args);
 
                 if (!array_mutation_keys.has(key)) return result;
@@ -946,8 +989,15 @@ const handler = {
 
         return child_container.proxy;
     },
+    /**
+     * @param {Record<any, any>} target
+     * @param {any} key
+     * @param {any} value
+     */
     set(target, key, value) {
         const container = object_to_container.get(target);
+        if (!container) throw new Error("[Core reactivity] Proxy container doesn't exists");
+
         const dep = container.deps[key] || (container.deps[key] = new Set());
 
         if (target[key] === value) return true;
@@ -958,8 +1008,14 @@ const handler = {
 
         return true;
     },
+    /**
+     * @param {Record<any, any>} target
+     * @param {any} key
+     */
     deleteProperty(target, key) {
         const container = object_to_container.get(target);
+        if (!container) throw new Error("[Core reactivity] Proxy container doesn't exists");
+
         delete target[key];
 
         const dep = container.deps[key] || (container.deps[key] = new Set());
@@ -979,12 +1035,25 @@ function create_proxy(container) {
 
 // DIRECTIVES
 
+/**
+ * @param {InputElement} node
+ * @param {[value:string, get:() => any, set:(new_value:any) => void]} param1
+ */
 export function bind(node, [value, get, set]) {
+    /** @type {Record<string, any>} */
     const event_name_dictionary = { "checked": node.type === "date" ? "change" : "click", "value": node.tagName === "select" ? "change" : "input" };
-    CORE.delegate(event_name_dictionary[value], node, (e) => set(e.target[value]))
-    return CORE.effect(() => node[value] = get());
+    CORE.delegate(event_name_dictionary[value], node, (/** @type {any} */ e) => set(e.target[value]))
+    return CORE.effect(() => {
+        /** @type {any} */
+        const node_cast = node;
+        node_cast[value] = get()
+    });
 }
 
+/**
+ * @param {HTMLElement} node
+ * @param {string} arg
+ */
 export function html(node, arg) {
     return effect(() => { node.innerHTML = arg; })
 }
