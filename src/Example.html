@@ -81,7 +81,7 @@
             if (files.length <= 0) return;
 
             console.time("Main Thread");
-            console.log(await Promise.all(files.map(parse_csv_fn)));
+            console.log(await Promise.all(files.map((file, i) => parse_csv_fn(file).then((result) => { console.log(`File #${i}: Complete`); return result; }))));
             console.timeEnd("Main Thread");
         }
 
@@ -90,7 +90,7 @@
             if (files.length <= 0) return;
 
             console.time("Worker Thread");
-            console.log(await Promise.all(files.map(worker_parse_csv)));
+            console.log(await Promise.all(files.map((file, i) => worker_parse_csv(file).then((result) => { console.log(`File #${i}: Complete`); return result; }))));
             console.timeEnd("Worker Thread");
         }
 
