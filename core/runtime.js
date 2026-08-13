@@ -96,6 +96,7 @@ export const CORE = Object.freeze({
         node.__events[event_name].push(func);
     },
     /**
+     * @param {Node} parentNode
      * @param {Node} startNode
      * @param {Node} endNode
      */
@@ -201,7 +202,7 @@ export const CORE = Object.freeze({
                 const new_each_dispose_blocks = [];
 
                 const is_array = Array.isArray(arr);
-                const is_map_or_set = arr instanceof Map || arr instanceof Set;
+                const is_map = arr instanceof Map;
 
                 let i = -1;
                 for (const ar of arr) {
@@ -214,7 +215,7 @@ export const CORE = Object.freeze({
 
                     CORE.set_param_args(fragment);
                     const index = i; // snapshot of i
-                    const dispose = then_fn(is_array ? (() => arr[index]) : is_map_or_set ? (() => arr.get(ar)) : () => ar, index);
+                    const dispose = then_fn(is_array ? (() => arr[index]) : is_map ? (() => arr.get(ar)) : () => ar, index);
                     new_each_dispose_blocks.push(dispose);
                 }
 
