@@ -530,15 +530,18 @@ export function on_destroy(fn) {
 
 // REACTIVITY
 
-/** @type {Function[]} */
+/** @typedef {Function & { deps : Set<Effect>[], children : Function[], is_priority:boolean, track_inner_effect:boolean, dispose:() => void }} Effect */
+
+/** @type {Effect[]} */
 let effect_stack = [];
-/** @type {Function | null} */
+/** @type {Effect | null} */
 let current_effect = null;
 
+/** @type {WeakSet<Set<Effect>>} */
 let dep_map = new WeakSet();
-/** @type {Function[]} */
+/** @type {Effect[]} */
 const prio_effect_queue = [];
-/** @type {Function[]} */
+/** @type {Effect[]} */
 const effect_queue = [];
 /** @type {Function[]} */
 const ticks = [];
@@ -550,7 +553,7 @@ export function next_tick() {
 }
 
 /**
- * @param {Set<Function>} dep
+ * @param {Set<Effect>} dep
  */
 function track(dep) {
     if (!current_effect || dep.has(current_effect)) return;
@@ -559,7 +562,7 @@ function track(dep) {
 }
 
 /**
- * @param {Set<Function>} dep
+ * @param {Set<Effect>} dep
  */
 function trigger(dep) {
     if (dep_map.has(dep)) return;
@@ -585,7 +588,7 @@ function trigger(dep) {
 }
 
 /**
- * @param {{ deps : Set<Function>, children : Set<Function> }[]} effect_fn
+ * @param {Effect} effect_fn
  */
 function dispose_deps(effect_fn) {
     for (const dep of effect_fn.deps) dep.delete(effect_fn);
@@ -598,11 +601,12 @@ function dispose_deps(effect_fn) {
 /**
  * Returns a dispose function for manually disposal of effect
  * @param {Function} fn
- * @param {{ track_inner_effect : boolean, is_priority : boolean }} options
+ * @param {{ track_inner_effect?: boolean, is_priority?: boolean }} options
  */
 export function effect(fn, options = { track_inner_effect : true, is_priority : false }) {
     if (typeof fn !== "function") throw new Error("[Core reactivity]: effect callback is not a function");
 
+    /** @type {Function | null} */
     let dispose_fn = null;
     let active = true;      // flag to prevent effect re-run if already dispose
 
@@ -637,10 +641,10 @@ export function effect(fn, options = { track_inner_effect : true, is_priority : 
         }
     };
 
-    wrapped.is_priority = options.is_priority;
-    wrapped.track_inner_effect = options.track_inner_effect;
+    wrapped.is_priority = Boolean(options?.is_priority);
+    wrapped.track_inner_effect = Boolean(options?.track_inner_effect);
 
-    /** @type {Set<Function>[]} */
+    /** @type {Set<Effect>[]} */
     wrapped.deps = [];
     /** @type {Function[]} */
     wrapped.children = [];
@@ -717,8 +721,12 @@ export function signal(initial_value) {
     return [read, set];
 }
 
+/**
+ * @template {any} T
+ * @param {() => T} fn
+ */
 export function memo(fn) {
-    const [value, setValue] = signal();
+    const [value, setValue] = signal(/** @type {T} */ (null));
     effect(() => setValue(fn()), { is_priority : true });
     return value;
 }
@@ -734,15 +742,15 @@ export function memo(fn) {
  *     () => T,
  *     () => any,
  *     () => boolean,
- *     (A instanceof Function ? (value:T) => void : {
+ *     (A extends Function ? (value:T) => void : {
  *         [K in keyof A]: (...args:Parameters<A[K]> extends [any, ...infer R] ? R : never) => (ReturnType<A[K]> extends Promise<any> ? Promise<void> : void)
  *     }),
  * ]}
  *
  * Returns:
  * 1. State getter
- * 2. Pending getter
- * 3. Error getter
+ * 2. Error getter
+ * 3. Pending getter
  * 4. Bound actions or State setter
  */
 export function managed_signal(initial_value, actions_or_refine_fn) {
@@ -796,7 +804,7 @@ const array_mutation_keys = new Set(["push","pop","shift","unshift","splice","so
 const IS_PROXY = Symbol("proxy");
 const CONTAINER = Symbol("container");
 
-const is_plain_object = (v) => v && typeof v === 'object' && ((Object.getPrototypeOf(v) === null || Object.getPrototypeOf(v) === Object.prototype) || Array.isArray(v));
+const is_plain_object = (/** @type {any} */ v) => v && typeof v === 'object' && ((Object.getPrototypeOf(v) === null || Object.getPrototypeOf(v) === Object.prototype) || Array.isArray(v));
 
 /** @typedef {ReturnType<typeof create_container>} Container */
 
