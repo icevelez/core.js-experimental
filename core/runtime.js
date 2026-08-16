@@ -405,6 +405,9 @@ window.__core__ = CORE;
 
 // CONTEXT API
 
+/** @typedef {Record<string | number | symbol, any>} Context */
+
+/** @type {Context} */
 const root_context = Object.create(null);
 let current_context = root_context;
 
@@ -412,16 +415,26 @@ function create_new_context() {
     return Object.create(current_context);
 }
 
+/**
+ * @param {Context} context
+ */
 function set_new_context(context) {
     const old_context = current_context;
     current_context = context;
     return old_context;
 }
 
+/**
+ * @param {string | number | symbol} key
+ * @param {any} value
+ */
 export function set_context(key, value) {
     current_context[key] = value;
 }
 
+/**
+ * @param {string | number | symbol} key
+ */
 export function get_context(key) {
     return current_context[key];
 }
@@ -429,15 +442,15 @@ export function get_context(key) {
 // LIFECYCLE API
 
 export async function init() {
-    /** @type {Map<string, Function>} */
+    /** @type {Map<string | number, Function>} */
     const core_components = new Map();
 
     await Promise.all(Array.from(document.querySelectorAll("template[core-src]")).map(async (template, i) => {
         const src = template.getAttribute("core-src") || "";
         const id = template.id || "";
         if (!src) return;
-        const component_instance = await component(src);
-        core_components.set(id || i, mount(component_instance, template, true));
+        const render_function = await component(src);
+        core_components.set(id || i, mount(render_function, template, true));
     }))
 
     return {
@@ -490,10 +503,16 @@ function run_deferred_mount_fns() {
     deferred_mount_fns.length = 0;
 }
 
+/**
+ * @param {Context} context
+ */
 function defer_mounting(context) {
     deferred_mount_fns.push(context);
 }
 
+/**
+ * @param {Context} context
+ */
 function run_mount_fns(context) {
     for (const fn of context[CORE.MOUNT_FNS]) {
         try {
@@ -507,6 +526,9 @@ function run_mount_fns(context) {
     context[CORE.MOUNT_FNS].length = 0;
 }
 
+/**
+ * @param {Context} context
+ */
 function run_destroy_fns(context) {
     for (const fn of context[CORE.DESTROY_FNS]) {
         try {
@@ -519,10 +541,16 @@ function run_destroy_fns(context) {
     context[CORE.DESTROY_FNS].length = 0;
 }
 
+/**
+ * @param {Function} fn
+ */
 export function on_mount(fn) {
     current_context[CORE.MOUNT_FNS].push(fn);
 }
 
+/**
+ * @param {Function} fn
+ */
 export function on_destroy(fn) {
     current_context[CORE.DESTROY_FNS].push(fn);
 }
