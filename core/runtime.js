@@ -156,7 +156,7 @@ export const CORE = Object.freeze({
         }, { track_inner_effect: false })
 
         return () => {
-            dispose();
+            if (dispose) dispose();
             effect_dispose();
         }
     },
@@ -337,6 +337,7 @@ export const CORE = Object.freeze({
         const dispose = (fn.default ? fn.default : fn)(props);
         anchor.before(fragment);
 
+        run_deferred_mount_fns();
         run_mount_fns(context);
         set_new_context(old_context);
 
