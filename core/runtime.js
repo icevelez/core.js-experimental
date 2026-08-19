@@ -31,6 +31,7 @@ export const CORE = Object.freeze({
     block_cache: new Map(),
     /** @type {{ [key:string] : Boolean }} */
     delegated_events: Object.create(null),
+    component,
     /**
      * Converts string to Document Fragment
      * @param {string} html_string
@@ -384,12 +385,6 @@ export function component(url) {
     component_cache.set(full_url, promise);
 
     return promise;
-}
-
-let current_component_promises;
-
-export async function define_components(component_arr) {
-    return Promise.all(component_arr.map(component));
 }
 
 window.__core__ = CORE;
