@@ -17,14 +17,24 @@
         const myaction = (node, arg) => {
             console.log("MyAction:", node, arg);
         }
+
+        const [change, setChange] = signal(true);
+        const changeMe = {
+            true : PropSlotExample,
+            false : Example,
+        }
     }
 </script>
 
+<button on:click="() => setChange(!change())">Click Me</button>
+<CoreComponent :default="changeMe[change()]"/>
+
+<!--
 {{#if Router.match("/benchmark").is_match}}
     {{#await component("./src/Benchmark.html")}}
         <h1>Loading Benchmark</h1>
     {{:then Benchmark}}
-        <CoreComponent default="Benchmark"/>
+        <CoreComponent :default="Benchmark"/>
     {{/await}}
 {{:else if Router.match("/todo").is_match}}
     <Todo/>
@@ -45,7 +55,7 @@
             <h1>Hidden From Parent</h1>
         {{/if}}
     </PropSlotExample>
-{{/if}}
+{{/if}}-->
 
 <style scoped>
     h1 {

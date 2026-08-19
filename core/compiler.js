@@ -182,11 +182,12 @@ function discover_node_instruction(node, node_index = [], instruction = { childr
     if (is_component_node || is_core_component_node) {
         const component = node.dataset.component || null;
         const component_tag = node.dataset.componentTag || null;
+        const is_component_dynamic = node.dataset.isComponentDynamic === "true";
         if (is_core_component_node && !component) throw new Error("[Core compiler]: Node processing error! No default component found");
         if (is_component_node && !component_tag) throw new Error("[Core compiler]: Node processing error! component not found");
         replace_node_with_anchor(node, "component-block");
         instruction.children.push(node_index);
-        instruction.component_blocks.push({ child_index: instruction.children.length - 1, component, component_tag, props_id: node.dataset.blockPropsId, slot_id: node.dataset.slotId });
+        instruction.component_blocks.push({ child_index: instruction.children.length - 1, is_component_dynamic, component, component_tag, props_id: node.dataset.blockPropsId, slot_id: node.dataset.slotId });
         return instruction;
     }
 
@@ -278,8 +279,11 @@ function process_components(template, template_processor) {
         if (match.startsWith("<CoreSlot")) return `<template data-block="core-slot"></template>`;
         if (match.startsWith("<CoreComponent")) {
             const _default = props.default;
-            delete props.default;
-            return `<template data-block="core-component" data-block-props-id="${props_id}" data-component="${_default}" ${slot_id ? `data-slot-id="${slot_id}"` : ''}></template>`;
+            const _dynamic_default_index = dynamic_props.findIndex(({ key }) => key === "default");
+            const _dynamic_default = dynamic_props[_dynamic_default_index]?.key === "default" ? dynamic_props[_dynamic_default_index].expr : null;
+            if (_dynamic_default) dynamic_props.splice(_dynamic_default_index, 1);
+            if (_default) delete props.default;
+            return `<template data-block="core-component" data-is-component-dynamic="${Boolean(_dynamic_default)}" data-block-props-id="${props_id}" data-component="${_dynamic_default || _default}" ${slot_id ? `data-slot-id="${slot_id}"` : ''}></template>`;
         }
 
         return `<template data-block="component" data-component-tag="${tag}" data-block-props-id="${props_id}" ${slot_id ? `data-slot-id="${slot_id}"` : ''}></template>`;
@@ -439,14 +443,16 @@ ${
         }).join("\n\n\t\t")
 }${
         (instruction.component_blocks.length > 0 ? `\n\n\t\t// IMPORTED COMPONENTS like <Component/> or\n\t\t// CORE COMPONENTS like <CoreComponent default="component_function"/>\n\t\t` : '') +
-            instruction.component_blocks.map((block, i) => {
-                const component = CORE.block_cache.get(block.props_id);
-                const component_slot_fn_code = CORE.block_cache.get(block.slot_id);
-                const props = Object.entries(component?.props || []);
-                return `const $COMPONENT${i} = ${block.component ? `${block.component}` : `${block.component_tag}`};
-        const $COMPONENT${i}_PROPS = {${props.map((p) => `get ${p[0]}() { return (${JSON.stringify(p[1])}) }`).join(",") }${ (props.length > 0 && component.dynamic_props.length > 0) ? ',' : ''} ${component.dynamic_props.map((p) => `get ${p.key}(){ return (${p.expr}) }`).join(", ")}};
-        if (!$COMPONENT${i}) throw new Error('[Core runtime]: Loading component error! Component "<${block.component || block.component_tag}>" not found');
-        $DISPOSE_FNS[${++dispose_fn_i}] = $CORE.core_component($CHILD${block.child_index}, $COMPONENT${i}, $COMPONENT${i}_PROPS, () => {${component_slot_fn_code?.replaceAll("\n", "\n\t") || ""}});`}).join("\n\n\t")
+        instruction.component_blocks.map((block, i) => {
+            const component = CORE.block_cache.get(block.props_id), icd = block.is_component_dynamic;
+            const component_slot_fn_code = CORE.block_cache.get(block.slot_id);
+            const props = Object.entries(component?.props || []);
+            return `const $COMPONENT${i}_PROPS = {${props.map((p) => `get ${p[0]}() { return (${JSON.stringify(p[1])}) }`).join(",") }${ (props.length > 0 && component.dynamic_props.length > 0) ? ',' : ''} ${component.dynamic_props.map((p) => `get ${p.key}(){ return (${p.expr}) }`).join(", ")}};
+        ${icd ? `$DISPOSE_FNS[${++dispose_fn_i}] = $CORE.effect(() => {\n\t\t` : ''}const $COMPONENT${i} = ${block.component ? `${block.component}` : `${block.component_tag}`};
+        if (!$COMPONENT${i}) throw new Error('[Core runtime]: Loading component error! Dynamic component not found');
+        ${icd ? `return` : `$DISPOSE_FNS[${++dispose_fn_i}] = `} $CORE.core_component($CHILD${block.child_index}, $COMPONENT${i}, $COMPONENT${i}_PROPS, () => {${component_slot_fn_code?.replaceAll("\n", "\n") || "return () => {}"}});
+        ${icd ? `})` : ''}`
+            }).join("\n\n\t")
 }${
         (instruction.use_directives.length > 0 ? '\n\n\t\t// USE DIRECTIVE\n\t' : '') +
         instruction.use_directives.map((directive, i) => {
