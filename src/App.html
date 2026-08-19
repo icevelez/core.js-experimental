@@ -6,6 +6,7 @@
     import Todo from "./Todo.html";
     import Example from "./Example.html";
     // import Empty from "./Empty.html";
+    import NotFound from "./NotFound.html";
 
     export default function() {
 
@@ -18,16 +19,20 @@
             console.log("MyAction:", node, arg);
         }
 
-        const [change, setChange] = signal(true);
+        const [change, setChange] = signal("");
         const changeMe = {
-            true : PropSlotExample,
-            false : Example,
+            "props" : PropSlotExample,
+            "example" : Example,
         }
     }
 </script>
 
-<button on:click="() => setChange(!change())">Click Me</button>
-<CoreComponent :default="changeMe[change()]"/>
+<select on:change="(e) => setChange(e.target.value)">
+    <option value="">N/A</option>
+    <option value="props">Props Example</option>
+    <option value="example">Example</option>
+</select>
+<CoreComponent :default="changeMe[change()] || NotFound"/>
 
 <!--
 {{#if Router.match("/benchmark").is_match}}

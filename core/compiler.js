@@ -450,7 +450,7 @@ ${
             return `const $COMPONENT${i}_PROPS = {${props.map((p) => `get ${p[0]}() { return (${JSON.stringify(p[1])}) }`).join(",") }${ (props.length > 0 && component.dynamic_props.length > 0) ? ',' : ''} ${component.dynamic_props.map((p) => `get ${p.key}(){ return (${p.expr}) }`).join(", ")}};
         ${icd ? `$DISPOSE_FNS[${++dispose_fn_i}] = $CORE.effect(() => {\n\t\t` : ''}const $COMPONENT${i} = ${block.component ? `${block.component}` : `${block.component_tag}`};
         if (!$COMPONENT${i}) throw new Error('[Core runtime]: Loading component error! Dynamic component not found');
-        ${icd ? `return` : `$DISPOSE_FNS[${++dispose_fn_i}] = `} $CORE.core_component($CHILD${block.child_index}, $COMPONENT${i}, $COMPONENT${i}_PROPS, () => {${component_slot_fn_code?.replaceAll("\n", "\n") || "return () => {}"}});
+        ${icd ? `return` : `$DISPOSE_FNS[${++dispose_fn_i}] =`} $CORE.core_component($CHILD${block.child_index}, $COMPONENT${i}, $COMPONENT${i}_PROPS, () => {${component_slot_fn_code?.replaceAll("\n", "\n") || "return () => {}"}});
         ${icd ? `})` : ''}`
             }).join("\n\n\t")
 }${

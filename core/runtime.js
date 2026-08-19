@@ -24,6 +24,7 @@ export const CORE = Object.freeze({
     run_destroy_fns,
     effect,
     set_new_context,
+    run_deferred_mount_fns,
     create_new_context,
     /** @type {DocumentFragment[]} */
     fragment_cache: [],
@@ -327,9 +328,22 @@ export const CORE = Object.freeze({
     core_component: function (anchor, fn, props, slot_fn) {
         const fragment = document.createDocumentFragment();
         CORE.set_param_args(fragment, slot_fn);
+
+        const context = create_new_context();
+        context[CORE.MOUNT_FNS] = [];
+        context[CORE.DESTROY_FNS] = [];
+        const old_context = set_new_context(context);
+
         const dispose = (fn.default ? fn.default : fn)(props);
         anchor.before(fragment);
-        return dispose;
+
+        run_mount_fns(context);
+        set_new_context(old_context);
+
+        return () => {
+            dispose();
+            run_destroy_fns(context);
+        };
     },
     /** @type {(key:string, block:BlockCache) => void} */
     add_block_to_cache: function (key, block) {
@@ -397,6 +411,9 @@ window.__core__ = CORE;
 const root_context = Object.create(null);
 let current_context = root_context;
 
+/**
+ * @returns {Context}
+ */
 function create_new_context() {
     return Object.create(current_context);
 }
@@ -484,7 +501,6 @@ export function mount(app, target, should_replace) {
 const deferred_mount_fns = [];
 
 function run_deferred_mount_fns() {
-    if (!current_context[CORE.IS_MOUNTED]) return;
     for (const context of deferred_mount_fns) run_mount_fns(context);
     deferred_mount_fns.length = 0;
 }
@@ -500,6 +516,7 @@ function defer_mounting(context) {
  * @param {Context} context
  */
 function run_mount_fns(context) {
+    if (!current_context[CORE.IS_MOUNTED]) return;
     for (const fn of context[CORE.MOUNT_FNS]) {
         try {
             const destroy_fn = fn();
