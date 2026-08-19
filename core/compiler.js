@@ -327,22 +327,18 @@ async function compiler(text, source_url, template_processor) {
     const href = source_url.substring(0, source_url.lastIndexOf("/") + 1);
 
     let code = `//# sourceURL=${source_url.split("/").at(-1)}${script || "\n\texport default function() {}"}`.replaceAll(/from\s+["']([^"']+\.js)["']/g, (expr, match) => match.startsWith("http") || match.startsWith("data:") ? expr : expr.replace(match, `${href}${match}`));
-    let component_anchor = "";
+    let import_component_anchor = "";
     const imported_components = [];
 
     code = code.replaceAll(/import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+\.html)["']\s*;?\s*$/gm, (expr, component, href) => {
         imported_components.push({ component, href });
-        return (!component_anchor) ? (component_anchor = expr) : "";
+        return (!import_component_anchor) ? (import_component_anchor = expr) : "";
     })
 
-    const split_path = source_url.split("/");
-    split_path.pop();
-    const absolute_url = split_path.join("/");
-
-    if (component_anchor) code = code.replace(`${component_anchor}\n`, `const [ ${imported_components.map(({ component }) => `${component}`).join(",\n\t")} ] = await Promise.all([${imported_components.map(({ href }) => `window.__core__.component("${href.startsWith("http") || href.startsWith("data") ? href : `${absolute_url}/${href}`}")`).join(",")}])`);
+    const absolute_url = source_url.split("/").slice(0, -1).join("/");
+    if (import_component_anchor) code = code.replace(`${import_component_anchor}\n`, `const [ ${imported_components.map(({ component }) => `${component}`).join(",\n\t")} ] = await Promise.all([${imported_components.map(({ href }) => `window.__core__.component("${href.startsWith("http") || href.startsWith("data") ? href : `${absolute_url}/${href}`}")`).join(",")}])`);
 
     const css_scope_id = `core-${make_id(6).toLowerCase()}`;
-
     const render_code_string = create_render_code_string(template_processor(process_components(template, template_processor)), { css_scope_id });
     const user_code = extract_default_function(code);
     code = code.replace(user_code, `${user_code}\n\t\t/* END OF USER CODE - CODE BELOW IS INJECTED BY THE RUNTIME COMPILER - IT REPRESENTS YOUR TEMPLATE */\n\t\t${render_code_string}`);
@@ -370,7 +366,7 @@ async function compiler(text, source_url, template_processor) {
 /**
  *
  * @param {DocumentFragment} fragment
- * @param {{ css_scope_id?: string, components_id?: number }} options
+ * @param {{ css_scope_id?: string }} options
  */
 function create_render_code_string(fragment, options) {
     if (typeof fragment === "string") fragment = CORE.html(fragment);
