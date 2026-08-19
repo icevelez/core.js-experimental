@@ -325,18 +325,26 @@ async function compiler(text, source_url, template_processor) {
     const template = text.replace(scriptEl?.outerHTML, "");
 
     const href = source_url.substring(0, source_url.lastIndexOf("/") + 1);
+
     let code = `//# sourceURL=${source_url.split("/").at(-1)}${script || "\n\texport default function() {}"}`.replaceAll(/from\s+["']([^"']+\.js)["']/g, (expr, match) => match.startsWith("http") || match.startsWith("data:") ? expr : expr.replace(match, `${href}${match}`));
+    let import_component_anchor = "";
+    const imported_components = [];
 
-    const components_id = `component-${make_id(6)}`;
+    code = code.replaceAll(/import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+\.html)["']\s*;?\s*$/gm, (expr, component, href) => {
+        imported_components.push({ component, href });
+        return (!import_component_anchor) ? (import_component_anchor = expr) : "";
+    })
+
+    const absolute_url = source_url.split("/").slice(0, -1).join("/");
+    if (import_component_anchor) code = code.replace(`${import_component_anchor}\n`, `const [ ${imported_components.map(({ component }) => `${component}`).join(",\n\t")} ] = await Promise.all([${imported_components.map(({ href }) => `window.__core__.component("${href.startsWith("http") || href.startsWith("data") ? href : `${absolute_url}/${href}`}")`).join(",")}])`);
+
     const css_scope_id = `core-${make_id(6).toLowerCase()}`;
-
-    const render_code_string = create_render_code_string(template_processor(process_components(template, template_processor)), { css_scope_id, components_id });
+    const render_code_string = create_render_code_string(template_processor(process_components(template, template_processor)), { css_scope_id });
     const user_code = extract_default_function(code);
     code = code.replace(user_code, `${user_code}\n\t\t/* END OF USER CODE - CODE BELOW IS INJECTED BY THE RUNTIME COMPILER - IT REPRESENTS YOUR TEMPLATE */\n\t\t${render_code_string}`);
 
     const has_styles = render_code_string.includes("$STYLE.innerHTML");
     const template_initialization_code = `
-    export const $COMPONENT_ID = "${components_id}"; // used by Core Assist
     const $CORE = window.__core__;\n\t${
     CORE.fragment_cache.map((frag, i) => {
         if (has_styles) inject_scope_id_to_children(frag, css_scope_id);
@@ -352,16 +360,13 @@ async function compiler(text, source_url, template_processor) {
     const script_blob = new Blob([code], { type: 'text/javascript' });
     const script_url = URL.createObjectURL(script_blob);
     const { default: render_function } = await import(script_url);
-
-    await CORE.resolve_components(components_id);
-
     return render_function
 }
 
 /**
  *
  * @param {DocumentFragment} fragment
- * @param {{ css_scope_id?: string, components_id?: number }} options
+ * @param {{ css_scope_id?: string }} options
  */
 function create_render_code_string(fragment, options) {
     if (typeof fragment === "string") fragment = CORE.html(fragment);
@@ -400,8 +405,6 @@ ${
 
         const $DISPOSE_FNS = [];
 ${
-    (options?.components_id ? `\n\t\tconst $COMPONENTS = $CORE.block_cache.get("${options.components_id}")` : '')
-}${
         (instruction.text_funcs.length > 0 || instruction.attr_funcs.length > 0) ? `
         // TEXT & ATTRIBUTES
         $DISPOSE_FNS[${++dispose_fn_i}] = $CORE.effect(() => {
@@ -438,7 +441,7 @@ ${
                 const component = CORE.block_cache.get(block.props_id);
                 const component_slot_fn_code = CORE.block_cache.get(block.slot_id);
                 const props = Object.entries(component?.props || []);
-                return `const $COMPONENT${i} = ${block.component ? `${block.component}` : `$COMPONENTS.${block.component_tag}`};
+                return `const $COMPONENT${i} = ${block.component ? `${block.component}` : `${block.component_tag}`};
         const $COMPONENT${i}_PROPS = {${props.map((p) => `get ${p[0]}() { return (${JSON.stringify(p[1])}) }`).join(",") }${ (props.length > 0 && component.dynamic_props.length > 0) ? ',' : ''} ${component.dynamic_props.map((p) => `get ${p.key}(){ return (${p.expr}) }`).join(", ")}};
         if (!$COMPONENT${i}) throw new Error('[Core runtime]: Loading component error! Component "<${block.component || block.component_tag}>" not found');
         $DISPOSE_FNS[${++dispose_fn_i}] = $CORE.core_component($CHILD${block.child_index}, $COMPONENT${i}, $COMPONENT${i}_PROPS, () => {${component_slot_fn_code?.replaceAll("\n", "\n\t") || ""}});`}).join("\n\n\t")

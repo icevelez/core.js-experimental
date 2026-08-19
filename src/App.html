@@ -1,13 +1,10 @@
 <script>
-    import { component, define_components, signal, memo, effect, bind } from "core";
+    import { signal, memo, effect, bind } from "core";
     import { Router } from "core-router";
 
-    define_components({
-        PropSlotExample : component("src/PropSlotExample.html"),
-        Todo : component("src/Todo.html"),
-        Example : component("src/Example.html"),
-        // Empty : component("src/Empty.html"),
-    })
+    import PropSlotExample from "./PropSlotExample.html";
+    import Todo from "./Todo.html";
+    import Example from "./Example.html";
 
     export default function() {
 

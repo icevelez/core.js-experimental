@@ -31,6 +31,7 @@ export const CORE = Object.freeze({
     block_cache: new Map(),
     /** @type {{ [key:string] : Boolean }} */
     delegated_events: Object.create(null),
+    component,
     /**
      * Converts string to Document Fragment
      * @param {string} html_string
@@ -330,14 +331,6 @@ export const CORE = Object.freeze({
         anchor.before(fragment);
         return dispose;
     },
-    resolve_components: async function (id) {
-        const component_promises = current_component_promises;
-        current_component_promises = null;
-        const keys = Object.keys(component_promises || Object.create(null));
-        const components = Object.create(component_promises || null);
-        await Promise.all(keys.map(async (k) => { components[k] = await component_promises[k]; }));
-        if (keys.length > 0) CORE.add_block_to_cache(id, components);
-    },
     /** @type {(key:string, block:BlockCache) => void} */
     add_block_to_cache: function (key, block) {
         CORE.block_cache.set(key, block)
@@ -376,10 +369,7 @@ export function component(url) {
             const text = await response.text();
             const script_blob = new Blob([text], { type: 'text/javascript' });
             const script_url = URL.createObjectURL(script_blob);
-            const { $COMPONENT_ID, default: render_function } = await import(script_url);
-
-            await CORE.resolve_components($COMPONENT_ID);
-
+            const { default: render_function } = await import(script_url);
             resolve(render_function);
             return;
         }
@@ -396,10 +386,6 @@ export function component(url) {
 
     return promise;
 }
-
-let current_component_promises;
-
-export const define_components = (component_promises) => current_component_promises = component_promises;
 
 window.__core__ = CORE;
 
