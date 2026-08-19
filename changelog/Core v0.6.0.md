@@ -107,11 +107,18 @@ while remaining within Core's Single-File Component model.
 
 ### Managed Signals
 
-Core now supports **managed signals** inside the runtime.
+Core now includes **Managed Signals**, an advanced state primitive built on top of Core's signal system.
 
-Managed signals allow Core to better integrate signal ownership and lifecycle management with component instances and runtime operations.
+Managed Signals combine reactive state with additional state-management capabilities such as:
 
-This provides a foundation for more controlled reactive resource management.
+* Validation and transformation
+* Reactive error state
+* Reactive pending/loading state
+* Functional state updates
+* Action-based state management
+* Asynchronous operations
+
+They are useful when state requires more than simple reads and writes, such as form validation, input normalization, API requests, and business rules.
 
 ---
 
