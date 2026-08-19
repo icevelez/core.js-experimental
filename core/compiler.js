@@ -323,11 +323,11 @@ async function compiler(text, source_url, template_processor) {
     const scriptEl = base.content.querySelector("script");
     const script = scriptEl?.innerHTML || "";
     const template = text.replace(scriptEl?.outerHTML, "");
-
     const href = source_url.substring(0, source_url.lastIndexOf("/") + 1);
 
-    let code = `//# sourceURL=${source_url.split("/").at(-1)}${script || "\n\texport default function() {}"}`.replaceAll(/from\s+["']([^"']+\.js)["']/g, (expr, match) => match.startsWith("http") || match.startsWith("data:") ? expr : expr.replace(match, `${href}${match}`));
+    let code = `//# sourceURL=${source_url.split("/").at(-1)}${script.replaceAll(/\/\/.*$/gm, '').replaceAll(/\/\*[\s\S]*?\*\//g, '') || "\n\texport default function() {}"}`.replaceAll(/from\s+["']([^"']+\.js)["']/g, (expr, match) => match.startsWith("http") || match.startsWith("data:") ? expr : expr.replace(match, `${href}${match}`));
     let import_component_anchor = "";
+
     const imported_components = [];
 
     code = code.replaceAll(/import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+\.html)["']\s*;?\s*$/gm, (expr, component, href) => {
