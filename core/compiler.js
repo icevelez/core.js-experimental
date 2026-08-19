@@ -327,16 +327,14 @@ async function compiler(text, source_url, template_processor) {
     const href = source_url.substring(0, source_url.lastIndexOf("/") + 1);
     let code = `//# sourceURL=${source_url.split("/").at(-1)}${script || "\n\texport default function() {}"}`.replaceAll(/from\s+["']([^"']+\.js)["']/g, (expr, match) => match.startsWith("http") || match.startsWith("data:") ? expr : expr.replace(match, `${href}${match}`));
 
-    const components_id = `component-${make_id(6)}`;
     const css_scope_id = `core-${make_id(6).toLowerCase()}`;
 
-    const render_code_string = create_render_code_string(template_processor(process_components(template, template_processor)), { css_scope_id, components_id });
+    const render_code_string = create_render_code_string(template_processor(process_components(template, template_processor)), { css_scope_id });
     const user_code = extract_default_function(code);
     code = code.replace(user_code, `${user_code}\n\t\t/* END OF USER CODE - CODE BELOW IS INJECTED BY THE RUNTIME COMPILER - IT REPRESENTS YOUR TEMPLATE */\n\t\t${render_code_string}`);
 
     const has_styles = render_code_string.includes("$STYLE.innerHTML");
     const template_initialization_code = `
-    export const $COMPONENT_ID = "${components_id}"; // used by Core Assist
     const $CORE = window.__core__;\n\t${
     CORE.fragment_cache.map((frag, i) => {
         if (has_styles) inject_scope_id_to_children(frag, css_scope_id);
@@ -352,9 +350,6 @@ async function compiler(text, source_url, template_processor) {
     const script_blob = new Blob([code], { type: 'text/javascript' });
     const script_url = URL.createObjectURL(script_blob);
     const { default: render_function } = await import(script_url);
-
-    await CORE.resolve_components(components_id);
-
     return render_function
 }
 
@@ -400,8 +395,6 @@ ${
 
         const $DISPOSE_FNS = [];
 ${
-    (options?.components_id ? `\n\t\tconst $COMPONENTS = $CORE.block_cache.get("${options.components_id}")` : '')
-}${
         (instruction.text_funcs.length > 0 || instruction.attr_funcs.length > 0) ? `
         // TEXT & ATTRIBUTES
         $DISPOSE_FNS[${++dispose_fn_i}] = $CORE.effect(() => {
@@ -438,7 +431,7 @@ ${
                 const component = CORE.block_cache.get(block.props_id);
                 const component_slot_fn_code = CORE.block_cache.get(block.slot_id);
                 const props = Object.entries(component?.props || []);
-                return `const $COMPONENT${i} = ${block.component ? `${block.component}` : `$COMPONENTS.${block.component_tag}`};
+                return `const $COMPONENT${i} = ${block.component ? `${block.component}` : `${block.component_tag}`};
         const $COMPONENT${i}_PROPS = {${props.map((p) => `get ${p[0]}() { return (${JSON.stringify(p[1])}) }`).join(",") }${ (props.length > 0 && component.dynamic_props.length > 0) ? ',' : ''} ${component.dynamic_props.map((p) => `get ${p.key}(){ return (${p.expr}) }`).join(", ")}};
         if (!$COMPONENT${i}) throw new Error('[Core runtime]: Loading component error! Component "<${block.component || block.component_tag}>" not found');
         $DISPOSE_FNS[${++dispose_fn_i}] = $CORE.core_component($CHILD${block.child_index}, $COMPONENT${i}, $COMPONENT${i}_PROPS, () => {${component_slot_fn_code?.replaceAll("\n", "\n\t") || ""}});`}).join("\n\n\t")

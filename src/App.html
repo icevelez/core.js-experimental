@@ -1,13 +1,12 @@
 <script>
-    import { component, define_components, signal, memo, effect, bind } from "core";
+    import { define_components, signal, memo, effect, bind } from "core";
     import { Router } from "core-router";
 
-    define_components({
-        PropSlotExample : component("src/PropSlotExample.html"),
-        Todo : component("src/Todo.html"),
-        Example : component("src/Example.html"),
-        // Empty : component("src/Empty.html"),
-    })
+    const [PropSlotExample, Todo, Example] = await define_components([
+        "src/PropSlotExample.html",
+        "src/Todo.html",
+        "src/Example.html",
+    ])
 
     export default function() {
 
