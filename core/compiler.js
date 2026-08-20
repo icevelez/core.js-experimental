@@ -367,6 +367,9 @@ async function compiler(text, source_url, template_processor) {
 
 const import_re = /import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+\.html)["']\s*;?/y;
 
+/**
+ * @param {string} source
+ */
 function collect_imports(source) {
     const imports = [];
     let depth = 0, i = 0;
