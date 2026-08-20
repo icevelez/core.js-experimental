@@ -429,13 +429,12 @@ function create_render_code_string(fragment, options) {
 
     const style_sheet = options?.css_scope_id ? apply_scope_css(fragment, options?.css_scope_id) : "";
     const instruction = discover_node_instruction(fragment);
-    const fragment_cache_index = CORE.fragment_cache.length;
     CORE.fragment_cache.push(fragment);
 
     const render_code_string = `
         const $CORE = window.__core__;
         const [$ANCHOR, $SLOT_FN] = $CORE.get_param_args();
-        const $TEMPLATE = $FRAGMENT_CACHE_${fragment_cache_index}.cloneNode(true);
+        const $TEMPLATE = $FRAGMENT_CACHE_${CORE.fragment_cache.length - 1}.cloneNode(true);
 
         const $NODE_START = $TEMPLATE.firstChild;
         const $NODE_END = $TEMPLATE.lastChild;
