@@ -27,14 +27,14 @@
     }
 </script>
 
-<!--<select on:change="(e) => setChange(e.target.value)">
+<select on:change="(e) => setChange(e.target.value)">
     <option value="">N/A</option>
     <option value="props">Props Example</option>
     <option value="example">Example</option>
 </select>
-<CoreComponent :default="changeMe[change()] || NotFound"/>-->
+<CoreComponent :default="changeMe[change()] || NotFound"/>
 
-{{#if Router.match("/benchmark").is_match}}
+<!--{{#if Router.match("/benchmark").is_match}}
     {{#await component("./src/Benchmark.html")}}
         <h1>Loading Benchmark</h1>
     {{:then Benchmark}}
@@ -59,7 +59,7 @@
             <h1>Hidden From Parent</h1>
         {{/if}}
     </PropSlotExample>
-{{/if}}
+{{/if}}-->
 
 <style scoped>
     h1 {
