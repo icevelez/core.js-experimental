@@ -488,7 +488,7 @@ ${
             }
         }).join("\n\n\t\t")
 }${
-        (instruction.component_blocks.length > 0 ? `\n\n\t\t// IMPORTED COMPONENTS like <Component/> or\n\t\t// CORE COMPONENTS like <CoreComponent default="component_function"/>\n\t\t` : '') +
+        (instruction.component_blocks.length > 0 ? `\n\n\t\t// COMPONENTS\n\t\t` : '') +
         instruction.component_blocks.map((block, i) => {
             const component = CORE.block_cache.get(block.props_id), icd = block.is_component_dynamic;
             const component_slot_fn_code = CORE.block_cache.get(block.slot_id);
@@ -496,7 +496,7 @@ ${
             return `const $COMPONENT${i}_PROPS = {${props.map((p) => `get ${p[0]}() { return (${JSON.stringify(p[1])}) }`).join(",") }${ (props.length > 0 && component.dynamic_props.length > 0) ? ',' : ''} ${component.dynamic_props.map((p) => `get ${p.key}(){ return (${p.expr}) }`).join(", ")}};
         ${icd ? `$DISPOSE_FNS[${++dispose_fn_i}] = $CORE.effect(() => {\n\t\t` : ''}const $COMPONENT${i} = ${block.component ? `${block.component}` : `${block.component_tag}`};
         if (!$COMPONENT${i}) throw new Error('[Core runtime]: Loading component error! Dynamic component not found');
-        ${icd ? `return` : `$DISPOSE_FNS[${++dispose_fn_i}] =`} $CORE.core_component($CHILD${block.child_index}, $COMPONENT${i}, $COMPONENT${i}_PROPS, () => {${component_slot_fn_code?.replaceAll("\n", "\n") || "return () => {}"}});
+        ${icd ? `return` : `$DISPOSE_FNS[${++dispose_fn_i}] =`} $CORE.core_component($CHILD${block.child_index}, $COMPONENT${i}, $COMPONENT${i}_PROPS, ${component_slot_fn_code ? `() => {${component_slot_fn_code.replaceAll("\n", "\n")}}` : "null"});
         ${icd ? `})` : ''}`
             }).join("\n\n\t")
 }${
@@ -506,11 +506,11 @@ ${
         $CORE.on_mount(() => ${directive.func_name}($CHILD${directive.child_index}, (${directive.expr || 'undefined'})))`;
         }).join("\n\t")
 }${
-        instruction.slot_child_index > -1 ? `\n\n\t\t// COMPONENT SLOT like <CoreSlot/>
+        instruction.slot_child_index > -1 ? `\n\n\t\t// COMPONENT SLOT
         if ($SLOT_FN) {
             const fragment = document.createDocumentFragment();
             $CORE.set_param_args(fragment);
-            $DISPOSE_FNS[${++dispose_fn_i}] = $SLOT_FN();
+            $DISPOSE_FNS[${++dispose_fn_i}] = $DISPOSE;
             $CHILD${instruction.slot_child_index}.before(fragment);
         }` : ''
 }
@@ -528,8 +528,7 @@ ${
             $DISPOSE_FNS.length = 0;
 
             const parent_node = $NODE_START.parentNode;
-            if (parent_node) $CORE.remove_nodes(parent_node, $NODE_START, $NODE_END);${
-            style_sheet ? `\n\t\t\tdocument.head.removeChild($STYLE);` : '' }
+            if (parent_node) $CORE.remove_nodes(parent_node, $NODE_START, $NODE_END);${style_sheet ? `\n\t\t\tdocument.head.removeChild($STYLE);` : '' }
         }\n\t`;
 
     return render_code_string;
