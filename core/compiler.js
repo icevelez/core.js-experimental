@@ -332,17 +332,17 @@ async function compiler(text, source_url, template_processor) {
     let code = script;
     code = `//# sourceURL=${source_url.split("/").at(-1)}${code || "\n\texport default function() {}"}`.replaceAll(/from\s+["']([^"']+\.js)["']/g, (expr, match) => match.startsWith("http") || match.startsWith("data:") ? expr : expr.replace(match, `${href}${match}`));
 
-    const imports = collect_imports(code);
+    const user_code = extract_default_function(code);
+    const imports = collect_imports(code.replace(user_code, ""));
     const absolute_url = source_url.split("/").slice(0, -1).join("/");
-    const import_component_anchor = imports[0]?.statement;
-    if (import_component_anchor) {
-        code = code.replace(`${import_component_anchor}`, `const [${imports.map(({ name }) => `${name}`).join(", ")}] = await Promise.all([${imports.map(({ src }) => `window.__core__.component("${src.startsWith("http") || src.startsWith("data") ? src : `${absolute_url}/${src}`}")`).join(",")}])`);
+
+    if (imports.length > 0) {
+        code = code.replace(`${imports[0].statement}`, `const [${imports.map(({ name }) => `${name}`).join(", ")}] = await Promise.all([${imports.map(({ src }) => `window.__core__.component("${src.startsWith("http") || src.startsWith("data") ? src : `${absolute_url}/${src}`}")`).join(",")}])`);
         imports.forEach(({ statement }) => { code = code.replace(statement, ""); });
     }
 
     const css_scope_id = `core-${make_id(6).toLowerCase()}`;
     const render_code_string = create_render_code_string(template_processor(process_components(template, template_processor)), { css_scope_id });
-    const user_code = extract_default_function(code);
     code = code.replace(user_code, `${user_code}\n\t\t/* END OF USER CODE - CODE BELOW IS INJECTED BY THE RUNTIME COMPILER - IT REPRESENTS YOUR TEMPLATE */\n\t\t${render_code_string}`);
 
     const has_styles = render_code_string.includes("$STYLE.innerHTML");
