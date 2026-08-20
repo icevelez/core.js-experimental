@@ -336,7 +336,7 @@ async function compiler(text, source_url, template_processor) {
     const absolute_url = source_url.split("/").slice(0, -1).join("/");
     const import_component_anchor = imports[0]?.statement;
     if (import_component_anchor) {
-        code = code.replace(`${import_component_anchor}`, `const [ ${imports.map(({ name }) => `${name}`).join(",")} ] = await Promise.all([${imports.map(({ src }) => `window.__core__.component("${src.startsWith("http") || src.startsWith("data") ? src : `${absolute_url}/${src}`}")`).join(",")}])`);
+        code = code.replace(`${import_component_anchor}`, `const [${imports.map(({ name }) => `${name}`).join(", ")}] = await Promise.all([${imports.map(({ src }) => `window.__core__.component("${src.startsWith("http") || src.startsWith("data") ? src : `${absolute_url}/${src}`}")`).join(",")}])`);
         imports.forEach(({ statement }) => { code = code.replace(statement, ""); });
     }
 
