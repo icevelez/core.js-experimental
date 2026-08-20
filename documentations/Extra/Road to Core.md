@@ -376,32 +376,6 @@ It worked and made the authoring experience feel natural again - at that point C
 
 ---
 
-## Core Assist
-
-Eventually I remembered what Evan You said "Runtime template compilation has a cost" it has slower initial load because the browser has to process the template, collect instruction, inject the render instruction in the JS module, then import said JS module
-
-> Is there a way to mitigate the cost of runtime compilation in the browser? 
-
-That led to Core Assist.
-
-Core Assist was never intended to replace Core.
-
-It was simply a cache layer 
-
-A way to preserve generated modules and reuse them when source files had not changed.
-
-if Core detects that Core Assist is active, Core would call Core Assis function to cache the compiled JS module and Core Assist would communicate to Core-Worker a Service Worker that would cache the JS module 
-
-Upon page reload Core would check if Core Assist is active, if it is, it would call Core Assist to check if the requested Core component source file has not changed - if not, Core Assist would take over and import the file directly at which the service worker would intercept and return the cached Module like 
-
-```js
-import("Dashboard.html")
-```
-
-Service Worker intercepts and returns the cached JS module instead of HTML
-
----
-
 ## Beyond Components
 
 That realization raised an even larger question.
