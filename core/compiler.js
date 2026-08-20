@@ -329,20 +329,16 @@ async function compiler(text, source_url, template_processor) {
     const template = text.replace(scriptEl?.outerHTML, "");
     const href = source_url.substring(0, source_url.lastIndexOf("/") + 1);
 
-    // remove comment line - this will break strings with comments inside said string....
-    let code = script.replaceAll(/\/\/.*$/gm, '').replaceAll(/\/\*[\s\S]*?\*\//g, '');
+    let code = script;
     code = `//# sourceURL=${source_url.split("/").at(-1)}${code || "\n\texport default function() {}"}`.replaceAll(/from\s+["']([^"']+\.js)["']/g, (expr, match) => match.startsWith("http") || match.startsWith("data:") ? expr : expr.replace(match, `${href}${match}`));
 
-    let import_component_anchor = "";
-    const imported_components = [];
-
-    code = code.replaceAll(/import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+\.html)["']\s*;?\s*$/gm, (expr, component, href) => {
-        imported_components.push({ component, href });
-        return (!import_component_anchor) ? (import_component_anchor = expr) : "";
-    })
-
+    const imports = collect_imports(code);
     const absolute_url = source_url.split("/").slice(0, -1).join("/");
-    if (import_component_anchor) code = code.replace(`${import_component_anchor}\n`, `const [ ${imported_components.map(({ component }) => `${component}`).join(",\n\t")} ] = await Promise.all([${imported_components.map(({ href }) => `window.__core__.component("${href.startsWith("http") || href.startsWith("data") ? href : `${absolute_url}/${href}`}")`).join(",")}])`);
+    const import_component_anchor = imports[0]?.statement;
+    if (import_component_anchor) {
+        code = code.replace(`${import_component_anchor}`, `const [ ${imports.map(({ name }) => `${name}`).join(",")} ] = await Promise.all([${imports.map(({ src }) => `window.__core__.component("${src.startsWith("http") || src.startsWith("data") ? src : `${absolute_url}/${src}`}")`).join(",")}])`);
+        imports.forEach(({ statement }) => { code = code.replace(statement, ""); });
+    }
 
     const css_scope_id = `core-${make_id(6).toLowerCase()}`;
     const render_code_string = create_render_code_string(template_processor(process_components(template, template_processor)), { css_scope_id });
@@ -367,6 +363,53 @@ async function compiler(text, source_url, template_processor) {
     const script_url = URL.createObjectURL(script_blob);
     const { default: render_function } = await import(script_url);
     return render_function
+}
+
+const import_re = /import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+\.html)["']\s*;?/y;
+
+function collect_imports(source) {
+    const imports = [];
+    let depth = 0, i = 0;
+
+    while (i < source.length) {
+        if (source.startsWith("//", i)) {
+            i = source.indexOf("\n", i + 2);
+            if (i < 0) break;
+            continue;
+        }
+
+        if (source.startsWith("/*", i)) {
+            i = source.indexOf("*/", i + 2) + 2;
+            if (i === 1) break;
+            continue;
+        }
+
+        if (/["'`]/.test(source[i])) {
+            const q = source[i++];
+            while (i < source.length) {
+                if (source[i] === "\\") i += 2;
+                else if (source[i++] === q) break;
+            }
+            continue;
+        }
+
+        if (source[i] === "{") depth++;
+        else if (source[i] === "}") depth--;
+
+        if (depth === 0 && source[i] === "i") {
+            import_re.lastIndex = i;
+            const m = import_re.exec(source);
+            if (m) {
+                imports.push({ name: m[1], src: m[2], statement: m[0] });
+                i = import_re.lastIndex;
+                continue;
+            }
+        }
+
+        i++;
+    }
+
+    return imports;
 }
 
 /**
