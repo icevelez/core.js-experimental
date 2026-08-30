@@ -308,7 +308,7 @@ function extract_default_function(source) {
         if (ch === "{") depth++;
         else if (ch === "}") {
             depth--;
-            if (depth === 0) return source.slice(match.index + 1, i);
+            if (depth === 0) return source.slice(match.index, i);
         }
     }
 

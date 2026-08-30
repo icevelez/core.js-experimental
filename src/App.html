@@ -23,6 +23,7 @@
         const changeMe = {
             "props" : PropSlotExample,
             "example" : Example,
+            "todo" : Todo,
         }
     }
 </script>
@@ -31,6 +32,7 @@
     <option value="">N/A</option>
     <option value="props">Props Example</option>
     <option value="example">Example</option>
+    <option value="todo">Todo</option>
 </select>
 <CoreComponent :default="changeMe[change()] || NotFound"/>
 
