@@ -178,7 +178,7 @@ Resulting URL:
 ## Getting Search Parameters
 
 ```js
-Router.search_params.get('page')
+Router.search_parameter.get('page')
 ```
 
 Example URL:
@@ -198,7 +198,7 @@ Result:
 ## Setting Search Parameters
 
 ```js
-Router.set_search_param('page', '5');
+Router.set_search_parameter('page', '5');
 ```
 
 Result:
@@ -212,7 +212,7 @@ Result:
 ## Removing Search Parameters
 
 ```js
-Router.remove_search_param('page');
+Router.remove_search_parameter('page');
 ```
 
 ---
@@ -222,7 +222,7 @@ Router.remove_search_param('page');
 The router also stores matched path parameters in:
 
 ```js
-Router.path_param
+Router.path_parameter
 ```
 
 Example:
@@ -230,7 +230,7 @@ Example:
 ```js
 Router.match('/users/:id');
 
-console.log(Router.path_param.get('id'));
+console.log(Router.path_parameter.get('id'));
 ```
 
 ---
