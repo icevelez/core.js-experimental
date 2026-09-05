@@ -19,19 +19,6 @@ The utilities are framework-agnostic and designed for small frontend application
 
 # Installation
 
-```js
-import {
-    delay,
-    debounce,
-    compressImage,
-    base64ImageToBlob,
-    print,
-    fetchOnce
-} from 'https://cdn.jsdelivr.net/gh/icevelez/Core@master/lib/util.js';
-```
-
-or with importmaps
-
 ```html
 <script type="importmap">
     {
@@ -45,10 +32,10 @@ or with importmaps
 import {
     delay,
     debounce,
-    compressImage,
-    base64ImageToBlob,
+    compress_image,
+    base64_image_to_blob,
     print,
-    fetchOnce
+    query
 } from 'util';
 ```
 
@@ -102,7 +89,7 @@ input.addEventListener('input', (e) => {
 
 ---
 
-# `compressImage(blobImage, options)`
+# `compress_image(blobImage, options)`
 
 Compresses an image into a smaller image format.
 
@@ -171,7 +158,7 @@ Examples:
 ## Example
 
 ```js
-const compressed = await compressImage(file, {
+const compressed = await compress_image(file, {
     quality: 0.6,
     max_size: 800,
     image_type: 'image/webp'
@@ -206,7 +193,7 @@ This utility only works in browser environments.
 
 ---
 
-# `base64ImageToBlob(base64_image)`
+# `base64_image_to_blob(base64_image)`
 
 Converts a Base64 image string into a `Blob`.
 
@@ -215,7 +202,7 @@ Converts a Base64 image string into a `Blob`.
 ## Example
 
 ```js
-const blob = base64ImageToBlob(base64String);
+const blob = base64_image_to_blob(base64String);
 ```
 
 Useful when:
@@ -280,7 +267,7 @@ The print utility:
 
 ---
 
-# `fetchOnce(url, options, response_transform)`
+# `query(url, options, response_transform)`
 
 A deduplicated fetch helper.
 
@@ -298,7 +285,7 @@ All callers receive the same Promise.
 ## Example
 
 ```js
-const users = await fetchOnce('/api/users', {}, (res) => res.json());
+const users = await query('/api/users', {}, (res) => res.json());
 ```
 
 ---
@@ -306,23 +293,11 @@ const users = await fetchOnce('/api/users', {}, (res) => res.json());
 ## Parallel Request Deduplication
 
 ```js
-const a = fetchOnce('/api/data');
-const b = fetchOnce('/api/data');
+const a = query('/api/data');
+const b = query('/api/data');
 
 console.log(a === b);
 // true
-```
-
----
-
-## Response Transform
-
-You may optionally transform the response.
-
-```js
-const data = await fetchOnce('/api/posts', {}, async (res) => {
-    return res.json();
-});
 ```
 
 ---

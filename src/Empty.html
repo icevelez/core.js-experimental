@@ -1,1 +1,19 @@
 <h1>Hello from Empty</h1>
+
+<!--
+<script>
+    import { memo } from "core";
+    import { Router } from "core-router";
+
+    export default function() {
+        const user_query = memo(() => fetch(`api/v1/users/${Router.pathParams.get("id")}`).then((res) => res.json()));
+    }
+</script>
+
+{{#await user_query()}}
+    <h1>Loading user data...</h1>
+{{:then user}}
+    <h1>Hello {{ user.username }}!</h1>
+{{:catch error}}
+    <h1>Error! {{ error }}</h1>
+{{/await}}-->
