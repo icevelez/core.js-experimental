@@ -2,6 +2,9 @@ import { CORE } from "core";
 
 /** @typedef {{ children : number[][], text_funcs : { child_index : number, expr : string }[], attr_funcs : { child_index : number, expr : string, property : string }[], bindings : { child_index : number, var : string, property : string, event_name : string }[], events : { child_index : number, event_name : string, expr : string }[], blocks : { child_index : number, type : string, id : string }[], core_component_blocks : { child_index : number, component_name : string, props_id : string }, component_blocks : { child_index : number, component_tag : string, props_id : string }, use_directives : { child_index : number, func_name : string, expr : string }[] slot_child_index : number  }} Instruction */
 
+/** @type {Map<string, BlockCache[]>} */
+const block_cache = new Map();
+
 /**
  * @param {string} text
  * @param {string} source_url
@@ -41,7 +44,7 @@ function template_parser(source) {
         }
         block.placeholder = `<template data-block="${block.name}" data-block-id="${block_id}"></template>`;
         html = html.slice(0, block.start) + block.placeholder + html.slice(block.end);
-        CORE.add_block_to_cache(block_id, parse[block.name](block.outer));
+        block_cache.set(block_id, parse[block.name](block.outer));
     }
 
     return html;
@@ -273,8 +276,8 @@ function process_components(template, template_processor) {
             }
         })
 
-        if (inner_content) CORE.add_block_to_cache(slot_id, create_render_code_string(template_processor(inner_content)));
-        CORE.add_block_to_cache(props_id, { props, dynamic_props });
+        if (inner_content) block_cache.set(slot_id, create_render_code_string(template_processor(inner_content)));
+        block_cache.set(props_id, { props, dynamic_props });
 
         if (match.startsWith("<CoreSlot")) return `<template data-block="core-slot"></template>`;
         if (match.startsWith("<CoreComponent")) {
@@ -315,6 +318,9 @@ function extract_default_function(source) {
     return null;
 }
 
+/** @type {DocumentFragment[]} */
+const fragment_cache = [];
+
 /**
  * @param {string} text
  * @param {string} source_url
@@ -348,7 +354,7 @@ async function compiler(text, source_url, template_processor) {
     const has_styles = render_code_string.includes("$STYLE.innerHTML");
     const template_initialization_code = `
     const $CORE = window.__core__;\n\t${
-    CORE.fragment_cache.map((frag, i) => {
+    fragment_cache.map((frag, i) => {
         if (has_styles) inject_scope_id_to_children(frag, css_scope_id);
         const template = document.createElement("template");
         template.content.append(frag);
@@ -357,7 +363,7 @@ async function compiler(text, source_url, template_processor) {
 
     code = `${code}${template_initialization_code}`;
 
-    CORE.fragment_cache.length = 0;
+    fragment_cache.length = 0;
 
     const script_blob = new Blob([code], { type: 'text/javascript' });
     const script_url = URL.createObjectURL(script_blob);
@@ -429,12 +435,12 @@ function create_render_code_string(fragment, options) {
 
     const style_sheet = options?.css_scope_id ? apply_scope_css(fragment, options?.css_scope_id) : "";
     const instruction = discover_node_instruction(fragment);
-    CORE.fragment_cache.push(fragment);
+    fragment_cache.push(fragment);
 
     const render_code_string = `
         const $CORE = window.__core__;
         const [$ANCHOR, $SLOT_FN] = $CORE.get_param_args();
-        const $TEMPLATE = $FRAGMENT_CACHE_${CORE.fragment_cache.length - 1}.cloneNode(true);
+        const $TEMPLATE = $FRAGMENT_CACHE_${fragment_cache.length - 1}.cloneNode(true);
 
         const $NODE_START = $TEMPLATE.firstChild;
         const $NODE_END = $TEMPLATE.lastChild;
@@ -474,7 +480,7 @@ ${
 }${
         (instruction.blocks.length > 0 ? '\n\n\t\t// IF/EACH/AWAIT BLOCKS\n\t\t' : '') +
         instruction.blocks.sort((a,b) => a.type.localeCompare(b.type)).map((block) => {
-            const block_data = CORE.block_cache.get(block.id);
+            const block_data = block_cache.get(block.id);
             const each_fn = (fn) => `(${block_data.key}${block_data.index_key ? `, ${block_data.index_key}` : ''}) => {${fn.replaceAll("\n", "\n\t")}}`;
             const await_fn = (fn, key = "") => fn ? `(${key}) => {${fn.replaceAll("\n", "\n\t")}}` : 'null';
             if (block.type === "if") {
@@ -482,15 +488,15 @@ ${
             } else if (block.type === "each") {
                 return `$DISPOSE_FNS[${++dispose_fn_i}] = $CORE.each($CHILD${block.child_index}, (() => ${block_data.expr}), ${each_fn(block_data.fn)}${block_data.else_fn ? `, ${each_fn(block_data.else_fn)}` : ''})`;
             } else if (block.type === "await") {
-                const block_data = CORE.block_cache.get(block.id);
+                const block_data = block_cache.get(block.id);
                 return `$DISPOSE_FNS[${++dispose_fn_i}] = $CORE.await($CHILD${block.child_index}, (() => ${block_data.expr}), ${await_fn(block_data.pending_fn)}, ${await_fn(block_data.then_fn, block_data.then_key)}, ${await_fn(block_data.catch_fn, block_data.catch_key)});`
             }
         }).join("\n\n\t\t")
 }${
         (instruction.component_blocks.length > 0 ? `\n\n\t\t// COMPONENTS\n\t\t` : '') +
         instruction.component_blocks.map((block, i) => {
-            const component = CORE.block_cache.get(block.props_id), icd = block.is_component_dynamic;
-            const component_slot_fn_code = CORE.block_cache.get(block.slot_id);
+            const component = block_cache.get(block.props_id), icd = block.is_component_dynamic;
+            const component_slot_fn_code = block_cache.get(block.slot_id);
             const props = Object.entries(component?.props || []);
             return `const $COMPONENT${i}_PROPS = {${props.map((p) => `get ${p[0]}() { return (${JSON.stringify(p[1])}) }`).join(",") }${ (props.length > 0 && component.dynamic_props.length > 0) ? ',' : ''} ${component.dynamic_props.map((p) => `get ${p.key}(){ return (${p.expr}) }`).join(", ")}};
         ${icd ? `$DISPOSE_FNS[${++dispose_fn_i}] = $CORE.effect(() => {\n\t\t\t` : ''}const $COMPONENT${i} = ${block.component ? `${block.component}` : `${block.component_tag}`};
@@ -523,14 +529,14 @@ ${
         return () => {
             $CORE.run_destroy_fns($CONTEXT);
 
-            for (const fn of $DISPOSE_FNS) fn();
+            for (const fn of $DISPOSE_FNS) { if (typeof fn === "function") fn() };
             $DISPOSE_FNS.length = 0;
 
             const parent_node = $NODE_START.parentNode;
             if (parent_node) $CORE.remove_nodes(parent_node, $NODE_START, $NODE_END);${style_sheet ? `\n\t\t\tdocument.head.removeChild($STYLE);` : '' }
         }\n\t`;
 
-    return render_code_string;
+    return render_code_string.replace("const $DISPOSE_FNS = [];", `const $DISPOSE_FNS = new Array(${++dispose_fn_i});`);
 }
 
 // SCOPE CSS

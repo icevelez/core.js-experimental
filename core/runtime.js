@@ -26,10 +26,6 @@ export const CORE = Object.freeze({
     set_new_context,
     run_deferred_mount_fns,
     create_new_context,
-    /** @type {DocumentFragment[]} */
-    fragment_cache: [],
-    /** @type {Map<string, BlockCache[]>} */
-    block_cache: new Map(),
     /** @type {{ [key:string] : Boolean }} */
     delegated_events: Object.create(null),
     component,
@@ -345,10 +341,6 @@ export const CORE = Object.freeze({
             dispose();
             run_destroy_fns(context);
         };
-    },
-    /** @type {(key:string, block:BlockCache) => void} */
-    add_block_to_cache: function (key, block) {
-        CORE.block_cache.set(key, block)
     },
 })
 

@@ -7,6 +7,7 @@
     import Example from "./Example.html";
     // import Empty from "./Empty.html";
     import NotFound from "./NotFound.html";
+    import Benchmark from "./Benchmark.html";
 
     export default function() {
 
@@ -24,6 +25,7 @@
             "props" : PropSlotExample,
             "example" : Example,
             "todo" : Todo,
+            "benchmark" : Benchmark,
         }
     }
 </script>
@@ -33,6 +35,7 @@
     <option value="props">Props Example</option>
     <option value="example">Example</option>
     <option value="todo">Todo</option>
+    <option value="benchmark">Benchmark</option>
 </select>
 <CoreComponent :default="changeMe[change()] || NotFound"/>
 
